@@ -33,16 +33,20 @@ func NewFlagSetFrom(fs *flag.FlagSet) *FlagSet {
 }
 
 // Required marks a flag name as required. It must be called before parsing and
-// flag must exist. Panics on error.
+// the flag must exist and not be an alias (see [AliasFor]); mark the long flag
+// instead. Panics on error.
 func (fs *FlagSet) Required(name string) {
 	if fs.Parsed() {
 		panic("flags already parsed")
 	}
-	if flg := fs.Lookup(name); flg != nil {
-		fs.req[name] = true
-		return
+	flg := fs.Lookup(name)
+	if flg == nil {
+		panic(fmt.Sprintf("flag %#q does not exist", name))
 	}
-	panic(fmt.Sprintf("flag %#q does not exist", name))
+	if long := IsAlias(flg.Usage); long != "" {
+		panic(fmt.Sprintf("flag %#q is an alias for flag %#q", name, long))
+	}
+	fs.req[name] = true
 }
 
 // IsRequired returns true when flag name (not alias) is required.

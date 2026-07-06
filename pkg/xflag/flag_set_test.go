@@ -98,6 +98,21 @@ func Test_FlagSet_Required_IsRequired(t *testing.T) {
 		// --- Then ---
 		assert.Equal(t, "flags already parsed", *msg)
 	})
+
+	t.Run("error - when called with an alias", func(t *testing.T) {
+		// --- Given ---
+		fs := NewFlagSet("flag-set", flag.ContinueOnError)
+		flgName := fs.String("name", "abc", "usage")
+		fs.StringVar(flgName, "n", "abc", AliasFor+"name")
+
+		// --- When ---
+		msg := assert.PanicMsg(t, func() { fs.Required("n") })
+
+		// --- Then ---
+		want := "flag `n` is an alias for flag `name`"
+		assert.Equal(t, want, *msg)
+		assert.False(t, fs.IsRequired("n"))
+	})
 }
 
 func Test_FlagSet_IsRequired(t *testing.T) {
