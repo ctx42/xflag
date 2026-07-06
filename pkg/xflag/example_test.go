@@ -64,11 +64,13 @@ func ExampleFlagSet_CheckRequired() {
 
 func ExampleBoolSL() {
 	fs := xflag.NewFlagSet("example", flag.ContinueOnError)
-	xflag.BoolSL(fs.FlagSet, "verbose", "v", false, "enable verbose output")
+	// The *SL constructors return the pointer backing both names, so the
+	// value can be read directly instead of by string key.
+	verbose := xflag.BoolSL(fs.FlagSet, "verbose", "v", false, "enable verbose output")
 
 	_ = fs.Parse([]string{"-v"})
 
-	fmt.Println(fs.GetBool("verbose"))
+	fmt.Println(*verbose)
 	// Output:
 	// true
 }

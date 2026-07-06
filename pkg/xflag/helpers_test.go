@@ -159,3 +159,44 @@ func Test_SL_tabular(t *testing.T) {
 		})
 	}
 }
+
+func Test_SL_returnsBoundPointer(t *testing.T) {
+	t.Run("pointer reflects the long flag after Parse", func(t *testing.T) {
+		// --- Given ---
+		fs := NewFlagSet("flg-set", flag.ContinueOnError)
+		got := StringSL(fs.FlagSet, "name", "n", "default", "usage")
+
+		// --- When ---
+		err := fs.Parse([]string{"--name", "long"})
+
+		// --- Then ---
+		assert.NoError(t, err)
+		assert.Equal(t, "long", *got)
+	})
+
+	t.Run("pointer reflects the short flag after Parse", func(t *testing.T) {
+		// --- Given ---
+		fs := NewFlagSet("flg-set", flag.ContinueOnError)
+		got := BoolSL(fs.FlagSet, "verbose", "v", false, "usage")
+
+		// --- When ---
+		err := fs.Parse([]string{"-v"})
+
+		// --- Then ---
+		assert.NoError(t, err)
+		assert.True(t, *got)
+	})
+
+	t.Run("long and short share the pointer", func(t *testing.T) {
+		// --- Given ---
+		fs := NewFlagSet("flg-set", flag.ContinueOnError)
+		got := IntSL(fs.FlagSet, "num", "n", 0, "usage")
+
+		// --- When ---
+		err := fs.Parse([]string{"--num", "1", "-n", "2"})
+
+		// --- Then ---
+		assert.NoError(t, err)
+		assert.Equal(t, 2, *got)
+	})
+}

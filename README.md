@@ -8,14 +8,14 @@ an existing program and reach for the extras only when you need them.
 
 ## Features
 
-| Feature            | What it adds                                       |
-|--------------------|----------------------------------------------------|
-| Drop-in `FlagSet`  | Embeds `*flag.FlagSet`; stdlib methods still work. |
-| Required flags     | Mark `Required`; catch unset flags after parsing.  |
-| Typed accessors    | Get/set without casting: `GetInt`, `SetBool`, etc. |
-| Long/short aliases | `*SL` binds `--name` and `-n` to a single value.   |
-| Alias-aware help   | `HelpOptions` folds each alias onto one help line. |
-| `WasSet`           | Tell an explicitly-set flag from a default value.  |
+| Feature            | What it adds                                          |
+|--------------------|-------------------------------------------------------|
+| Drop-in `FlagSet`  | Embeds `*flag.FlagSet`; stdlib methods still work.    |
+| Required flags     | Mark `Required`; catch unset flags after parsing.     |
+| Typed accessors    | Get/set without casting: `GetInt`, `SetBool`, etc.    |
+| Long/short aliases | `*SL` binds `--name`/`-n`, returns the value pointer. |
+| Alias-aware help   | `HelpOptions` folds each alias onto one help line.    |
+| `WasSet`           | Tell an explicitly-set flag from a default value.     |
 
 ## Install
 
@@ -68,16 +68,19 @@ fmt.Println(fs.CheckRequired())
 ### Long/short aliases
 
 The `*SL` constructors register a long and a short name backed by a single
-value, so `-v` and `--verbose` are interchangeable:
+value, so `-v` and `--verbose` are interchangeable. They return the pointer
+backing both names, so the value can be read directly instead of by string key:
 
 <!-- gmdoceg:pkg/xflag/ExampleBoolSL -->
 ```go
 fs := xflag.NewFlagSet("example", flag.ContinueOnError)
-xflag.BoolSL(fs.FlagSet, "verbose", "v", false, "enable verbose output")
+// The *SL constructors return the pointer backing both names, so the
+// value can be read directly instead of by string key.
+verbose := xflag.BoolSL(fs.FlagSet, "verbose", "v", false, "enable verbose output")
 
 _ = fs.Parse([]string{"-v"})
 
-fmt.Println(fs.GetBool("verbose"))
+fmt.Println(*verbose)
 // Output:
 // true
 ```
@@ -154,7 +157,8 @@ top of it:
   `SetString`; low-level access via `Getter` and `Valuer`.
 - **Long/short aliases** — the `*SL` constructors `BoolSL`, `IntSL`, `Int64SL`,
   `Uint64SL`, `StringSL`, `Float64SL`, `DurationSL`, `FuncSL`, rendered by
-  `HelpOptions` / `HelpOptionLines`.
+  `HelpOptions` / `HelpOptionLines`. Each (except `FuncSL`) returns the pointer
+  backing both names, mirroring stdlib `flag.Bool`.
 
 Full API docs: [pkg.go.dev/github.com/ctx42/xflag/pkg/xflag](https://pkg.go.dev/github.com/ctx42/xflag/pkg/xflag).
 
