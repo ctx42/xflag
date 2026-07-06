@@ -1,3 +1,10 @@
+## v0.10.0 (Mon, 06 Jul 2026 19:17:34 UTC)
+- feat: return the value pointer from *SL constructors.
+- feat!: make *SL constructors methods on *FlagSet.
+- feat!: track flag aliases in the FlagSet, not the usage string.
+- feat: wrap parse failures in a typed *ParseError.
+- test: simplify test case names.
+
 ## v0.9.0 (Mon, 06 Jul 2026 14:18:50 UTC)
 - fix: reject wrong-type flags in FlagSet.SetBool.
 - fix: reject wrong-type flags in FlagSet.SetString.
