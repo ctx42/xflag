@@ -11,11 +11,9 @@ func Test_HelpOptions(t *testing.T) {
 	t.Run("with aliases", func(t *testing.T) {
 		// --- Given ---
 		fs := NewFlagSet("test", flag.ContinueOnError)
-		flgMkdir := fs.Bool("mkdir", false, "mkdir help")
-		fs.BoolVar(flgMkdir, "d", false, AliasFor+"mkdir")
+		fs.BoolSL("mkdir", "d", false, "mkdir help")
 		fs.String("fast", "fast", "fast help")
-		flgName := fs.String("name", "project", "name help")
-		fs.StringVar(flgName, "n", "", AliasFor+"name")
+		fs.StringSL("name", "n", "project", "name help")
 
 		// --- When ---
 		have := HelpOptions(fs)
@@ -44,11 +42,9 @@ func Test_HelpOptionLines(t *testing.T) {
 	t.Run("with aliases", func(t *testing.T) {
 		// --- Given ---
 		fs := NewFlagSet("test", flag.ContinueOnError)
-		flgMkdir := fs.Bool("mkdir", false, "mkdir help")
-		fs.BoolVar(flgMkdir, "d", false, AliasFor+"mkdir")
+		fs.BoolSL("mkdir", "d", false, "mkdir help")
 		fs.String("fast", "fast", "fast help")
-		flgName := fs.String("name", "project", "name help")
-		fs.StringVar(flgName, "n", "", AliasFor+"name")
+		fs.StringSL("name", "n", "project", "name help")
 
 		// --- When ---
 		have := HelpOptionLines(fs)
@@ -72,28 +68,6 @@ func Test_HelpOptionLines(t *testing.T) {
 		// --- Then ---
 		assert.Empty(t, have)
 	})
-}
-
-func Test_IsAlias_tabular(t *testing.T) {
-	tt := []struct {
-		testN string
-
-		usage string
-		want  string
-	}{
-		{"normal", "usage", ""},
-		{"alias", AliasFor + "usage", "usage"},
-	}
-
-	for _, tc := range tt {
-		t.Run(tc.testN, func(t *testing.T) {
-			// --- When ---
-			have := IsAlias(tc.usage)
-
-			// --- Then ---
-			assert.Equal(t, tc.want, have)
-		})
-	}
 }
 
 func Test_SL_tabular(t *testing.T) {
@@ -155,7 +129,9 @@ func Test_SL_tabular(t *testing.T) {
 			}
 			fs.FlagSet.VisitAll(fn)
 			assert.Equal(t, []string{"n", "name"}, names)
-			assert.Equal(t, []string{AliasFor + "name", "usage"}, usages)
+			// The short flag carries the real usage now, not a sentinel;
+			// the alias link lives in the FlagSet, not the usage string.
+			assert.Equal(t, []string{"usage", "usage"}, usages)
 		})
 	}
 }
@@ -198,5 +174,19 @@ func Test_SL_returnsBoundPointer(t *testing.T) {
 		// --- Then ---
 		assert.NoError(t, err)
 		assert.Equal(t, 2, *got)
+	})
+
+	t.Run("records the alias on zero value construction", func(t *testing.T) {
+		// --- Given ---
+		ffs := flag.NewFlagSet("flg-set", flag.ContinueOnError)
+		fs := &FlagSet{FlagSet: ffs} // Nil aliasOf map.
+
+		// --- When ---
+		fs.BoolSL("verbose", "v", false, "usage")
+
+		// --- Then --- (alias recorded, so VisitAll skips the short flag)
+		var names []string
+		fs.VisitAll(func(flg *flag.Flag) { names = append(names, flg.Name) })
+		assert.Equal(t, []string{"verbose"}, names)
 	})
 }

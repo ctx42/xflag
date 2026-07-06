@@ -5,20 +5,9 @@ import (
 	"flag"
 	"fmt"
 	"sort"
-	"strings"
 	"text/tabwriter"
 	"time"
 )
-
-// AliasFor is a flag usage prefix indicating the flag is an alias to another
-// flag.
-//
-// Example:
-//
-//	const argName = "name"
-//	fp.fs.StringVar(&fp.fls.ImgName, argName, "", "docker image name")
-//	fp.fs.StringVar(&fp.fls.ImgName, "n", "", xflag.AliasFor+argName)
-const AliasFor = "~~alias~for~~:"
 
 // HelpOptions returns formatted help with list of options.
 func HelpOptions(fs *FlagSet) string {
@@ -41,11 +30,11 @@ func HelpOptionLines(fs *FlagSet) []string {
 
 	fs.FlagSet.VisitAll(func(flg *flag.Flag) {
 		name := flg.Name
-		if alias := IsAlias(flg.Usage); alias != "" {
-			row := rows[alias]
-			row[0] = alias
+		if long := fs.aliasOf[name]; long != "" {
+			row := rows[long]
+			row[0] = long
 			row[1] = name
-			rows[alias] = row
+			rows[long] = row
 			return
 		}
 
@@ -69,19 +58,12 @@ func HelpOptionLines(fs *FlagSet) []string {
 	return buf
 }
 
-// IsAlias returns the flag name which usage is for.
-func IsAlias(usage string) string {
-	if alias, ok := strings.CutPrefix(usage, AliasFor); ok && alias != "" {
-		return alias
-	}
-	return ""
-}
-
 // BoolSL adds a bool flag with long and short names to the flag set and returns
 // the pointer that stores its value. The long and short names share the pointer.
 func (fs *FlagSet) BoolSL(long, short string, value bool, usage string) *bool {
 	val := fs.Bool(long, value, usage)
-	fs.BoolVar(val, short, value, AliasFor+long)
+	fs.BoolVar(val, short, value, usage)
+	fs.recordAlias(short, long)
 	return val
 }
 
@@ -89,7 +71,8 @@ func (fs *FlagSet) BoolSL(long, short string, value bool, usage string) *bool {
 // the pointer that stores its value. The long and short names share the pointer.
 func (fs *FlagSet) IntSL(long, short string, value int, usage string) *int {
 	val := fs.Int(long, value, usage)
-	fs.IntVar(val, short, value, AliasFor+long)
+	fs.IntVar(val, short, value, usage)
+	fs.recordAlias(short, long)
 	return val
 }
 
@@ -98,7 +81,8 @@ func (fs *FlagSet) IntSL(long, short string, value int, usage string) *int {
 // pointer.
 func (fs *FlagSet) Int64SL(long, short string, value int64, usage string) *int64 {
 	val := fs.Int64(long, value, usage)
-	fs.Int64Var(val, short, value, AliasFor+long)
+	fs.Int64Var(val, short, value, usage)
+	fs.recordAlias(short, long)
 	return val
 }
 
@@ -112,7 +96,8 @@ func (fs *FlagSet) Uint64SL(
 ) *uint64 {
 
 	val := fs.Uint64(long, value, usage)
-	fs.Uint64Var(val, short, value, AliasFor+long)
+	fs.Uint64Var(val, short, value, usage)
+	fs.recordAlias(short, long)
 	return val
 }
 
@@ -121,7 +106,8 @@ func (fs *FlagSet) Uint64SL(
 // pointer.
 func (fs *FlagSet) StringSL(long, short, value, usage string) *string {
 	val := fs.String(long, value, usage)
-	fs.StringVar(val, short, value, AliasFor+long)
+	fs.StringVar(val, short, value, usage)
+	fs.recordAlias(short, long)
 	return val
 }
 
@@ -135,7 +121,8 @@ func (fs *FlagSet) Float64SL(
 ) *float64 {
 
 	val := fs.Float64(long, value, usage)
-	fs.Float64Var(val, short, value, AliasFor+long)
+	fs.Float64Var(val, short, value, usage)
+	fs.recordAlias(short, long)
 	return val
 }
 
@@ -149,12 +136,14 @@ func (fs *FlagSet) DurationSL(
 ) *time.Duration {
 
 	val := fs.Duration(long, value, usage)
-	fs.DurationVar(val, short, value, AliasFor+long)
+	fs.DurationVar(val, short, value, usage)
+	fs.recordAlias(short, long)
 	return val
 }
 
 // FuncSL adds a "function" flag with long and short names to the flag set.
 func (fs *FlagSet) FuncSL(long, short, usage string, fn func(string) error) {
 	fs.Func(long, usage, fn)
-	fs.Func(short, AliasFor+long, fn)
+	fs.Func(short, usage, fn)
+	fs.recordAlias(short, long)
 }

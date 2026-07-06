@@ -115,8 +115,7 @@ func Test_FlagSet_Required_IsRequired(t *testing.T) {
 	t.Run("error - when called with an alias", func(t *testing.T) {
 		// --- Given ---
 		fs := NewFlagSet("flag-set", flag.ContinueOnError)
-		flgName := fs.String("name", "abc", "usage")
-		fs.StringVar(flgName, "n", "abc", AliasFor+"name")
+		fs.StringSL("name", "n", "abc", "usage")
 
 		// --- When ---
 		msg := assert.PanicMsg(t, func() { fs.Required("n") })
@@ -248,8 +247,7 @@ func Test_FlagSet_VisitAll(t *testing.T) {
 	t.Run("visiting set values", func(t *testing.T) {
 		// --- Given ---
 		fs := NewFlagSet("flag-set", flag.ContinueOnError)
-		flgA := fs.String("flg-a", "flg-a-def", "flg-a help")
-		fs.StringVar(flgA, "a", "flg-a-def", AliasFor+"flg-a")
+		fs.StringSL("flg-a", "a", "flg-a-def", "flg-a help")
 		fs.String("flg-b", "flg-b-def", "flg-b help")
 		fs.String("flg-c", "flg-c-def", "flg-c help")
 		fs.String("rouge", "abc", "rouge usage")
@@ -264,14 +262,32 @@ func Test_FlagSet_VisitAll(t *testing.T) {
 		// --- Then ---
 		assert.Equal(t, []string{"flg-a", "flg-b", "flg-c", "rouge"}, have)
 	})
+
+	t.Run("alias flag is skipped but keeps a clean usage", func(t *testing.T) {
+		// --- Given ---
+		fs := NewFlagSet("flag-set", flag.ContinueOnError)
+		fs.StringSL("name", "n", "def", "name help")
+
+		// --- When --- (xflag VisitAll skips the alias)
+		var xNames []string
+		fs.VisitAll(func(flg *flag.Flag) { xNames = append(xNames, flg.Name) })
+
+		// A raw stdlib walk sees both flags with real, sentinel-free usage.
+		raw := make(map[string]string)
+		fs.FlagSet.VisitAll(func(flg *flag.Flag) { raw[flg.Name] = flg.Usage })
+
+		// --- Then ---
+		assert.Equal(t, []string{"name"}, xNames)
+		assert.Equal(t, "name help", raw["n"])
+		assert.Equal(t, "name help", raw["name"])
+	})
 }
 
 func Test_FlagSet_Visit(t *testing.T) {
 	t.Run("visiting set values", func(t *testing.T) {
 		// --- Given ---
 		fs := NewFlagSet("flag-set", flag.ContinueOnError)
-		flgA := fs.String("flg-a", "flg-a-def", "flg-a help")
-		fs.StringVar(flgA, "a", "flg-a-def", AliasFor+"flg-a")
+		fs.StringSL("flg-a", "a", "flg-a-def", "flg-a help")
 		fs.String("flg-b", "flg-b-def", "flg-b help")
 		fs.String("flg-c", "flg-c-def", "flg-c help")
 		fs.String("rouge", "abc", "rouge usage")
@@ -290,8 +306,7 @@ func Test_FlagSet_Visit(t *testing.T) {
 	t.Run("alias is resolved", func(t *testing.T) {
 		// --- Given ---
 		fs := NewFlagSet("flag-set", flag.ContinueOnError)
-		flgA := fs.String("flg-a", "flg-a-def", "flg-a help")
-		fs.StringVar(flgA, "a", "flg-a-def", AliasFor+"flg-a")
+		fs.StringSL("flg-a", "a", "flg-a-def", "flg-a help")
 		fs.String("flg-b", "flg-b-def", "flg-b help")
 		fs.String("flg-c", "flg-c-def", "flg-c help")
 		fs.String("rouge", "abc", "rouge usage")
@@ -310,8 +325,7 @@ func Test_FlagSet_Visit(t *testing.T) {
 	t.Run("alias and long both set visits canonical once", func(t *testing.T) {
 		// --- Given ---
 		fs := NewFlagSet("flag-set", flag.ContinueOnError)
-		flgA := fs.String("flg-a", "flg-a-def", "flg-a help")
-		fs.StringVar(flgA, "a", "flg-a-def", AliasFor+"flg-a")
+		fs.StringSL("flg-a", "a", "flg-a-def", "flg-a help")
 		must.Nil(fs.Parse([]string{"-a", "abc", "--flg-a", "xyz"}))
 
 		var have []string
@@ -327,7 +341,10 @@ func Test_FlagSet_Visit(t *testing.T) {
 	t.Run("alias to missing long flag is skipped", func(t *testing.T) {
 		// --- Given ---
 		fs := NewFlagSet("flag-set", flag.ContinueOnError)
-		fs.String("a", "a-def", AliasFor+"missing")
+		// An alias whose long flag was never registered (only reachable by
+		// poking the internal map directly; the *SL methods never create it).
+		fs.String("a", "a-def", "a usage")
+		fs.recordAlias("a", "missing")
 		fs.String("flg-b", "flg-b-def", "flg-b help")
 		must.Nil(fs.Parse([]string{"-a", "abc", "--flg-b", "xyz"}))
 
@@ -345,12 +362,9 @@ func Test_FlagSet_Visit(t *testing.T) {
 func Test_FlagSet_WasSet_tabular(t *testing.T) {
 	// --- Given ---
 	fs := NewFlagSet("flag-set", flag.ContinueOnError)
-	flgA := fs.String("flg-a", "flg-a-def", "flg-a help")
-	fs.StringVar(flgA, "a", "flg-a-def", AliasFor+"flg-a")
-	flgB := fs.String("flg-b", "flg-b-def", "flg-b help")
-	fs.StringVar(flgB, "b", "flg-b-def", AliasFor+"flg-b")
-	flgC := fs.String("flg-c", "flg-c-def", "flg-c help")
-	fs.StringVar(flgC, "c", "flg-c-def", AliasFor+"flg-c")
+	fs.StringSL("flg-a", "a", "flg-a-def", "flg-a help")
+	fs.StringSL("flg-b", "b", "flg-b-def", "flg-b help")
+	fs.StringSL("flg-c", "c", "flg-c-def", "flg-c help")
 
 	fs.String("rouge", "abc", "rouge usage")
 	assert.NoError(t, fs.Parse([]string{"-a", "abc", "--flg-b", "def"}))

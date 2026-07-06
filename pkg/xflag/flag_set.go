@@ -13,8 +13,9 @@ var ErrReqFlag = errors.New("flag is required")
 
 // FlagSet represents program flags.
 type FlagSet struct {
-	*flag.FlagSet                 // Embedded StdLib flag set.
-	req           map[string]bool // Required flags.
+	*flag.FlagSet                   // Embedded StdLib flag set.
+	req           map[string]bool   // Required flags.
+	aliasOf       map[string]string // Maps a short (alias) flag to its long flag.
 }
 
 // NewFlagSet returns a new instance of FlagSet. It has the same arguments as
@@ -29,21 +30,30 @@ func NewFlagSetFrom(fs *flag.FlagSet) *FlagSet {
 	return &FlagSet{
 		FlagSet: fs,
 		req:     make(map[string]bool),
+		aliasOf: make(map[string]string),
 	}
 }
 
+// recordAlias records that the short flag is an alias of the long flag. It is
+// zero-value safe: the backing map is created on first use.
+func (fs *FlagSet) recordAlias(short, long string) {
+	if fs.aliasOf == nil {
+		fs.aliasOf = make(map[string]string)
+	}
+	fs.aliasOf[short] = long
+}
+
 // Required marks a flag name as required. It must be called before parsing and
-// the flag must exist and not be an alias (see [AliasFor]); mark the long flag
-// instead. Panics on error.
+// the flag must exist and not be an alias; mark the long flag instead. Panics
+// on error.
 func (fs *FlagSet) Required(name string) {
 	if fs.Parsed() {
 		panic("flags already parsed")
 	}
-	flg := fs.Lookup(name)
-	if flg == nil {
+	if fs.Lookup(name) == nil {
 		panic(fmt.Sprintf("flag %#q does not exist", name))
 	}
-	if long := IsAlias(flg.Usage); long != "" {
+	if long := fs.aliasOf[name]; long != "" {
 		panic(fmt.Sprintf("flag %#q is an alias for flag %#q", name, long))
 	}
 	if fs.req == nil {
@@ -76,7 +86,7 @@ func (fs *FlagSet) CheckRequired() error {
 // aliases.
 func (fs *FlagSet) VisitAll(fn func(*flag.Flag)) {
 	fs.FlagSet.VisitAll(func(flg *flag.Flag) {
-		if IsAlias(flg.Usage) == "" {
+		if fs.aliasOf[flg.Name] == "" {
 			fn(flg)
 		}
 	})
@@ -88,8 +98,8 @@ func (fs *FlagSet) VisitAll(fn func(*flag.Flag)) {
 func (fs *FlagSet) Visit(fn func(*flag.Flag)) {
 	seen := make(map[string]bool)
 	fs.FlagSet.Visit(func(flg *flag.Flag) {
-		if name := IsAlias(flg.Usage); name != "" {
-			if flg = fs.Lookup(name); flg == nil {
+		if long := fs.aliasOf[flg.Name]; long != "" {
+			if flg = fs.Lookup(long); flg == nil {
 				return
 			}
 		}
