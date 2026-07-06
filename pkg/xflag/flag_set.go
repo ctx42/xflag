@@ -121,13 +121,21 @@ func (fs *FlagSet) GetBool(name string) bool {
 // SetBool sets the value of a boolean flag identified by `name`. If the flag
 // is not of type `bool` or does not exist, it returns an error.
 func (fs *FlagSet) SetBool(name string, value bool) error {
-	if flg := fs.Lookup(name); flg != nil {
-		if err := flg.Value.Set(strconv.FormatBool(value)); err != nil {
-			return fmt.Errorf("flag %#q %w", name, err)
-		}
-		return nil
+	flg := fs.Lookup(name)
+	if flg == nil {
+		return fmt.Errorf("cannot set not existing flag %q", name)
 	}
-	return fmt.Errorf("cannot set not existing flag %q", name)
+	get, ok := flg.Value.(flag.Getter)
+	if !ok {
+		return fmt.Errorf("flag %#q is not a bool", name)
+	}
+	if _, ok := get.Get().(bool); !ok {
+		return fmt.Errorf("flag %#q is not a bool", name)
+	}
+	if err := flg.Value.Set(strconv.FormatBool(value)); err != nil {
+		return fmt.Errorf("flag %#q %w", name, err)
+	}
+	return nil
 }
 
 // GetInt returns the parsed (or default) value of the int flag. Returns

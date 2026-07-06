@@ -421,9 +421,22 @@ func Test_FlagSet_SetBool(t *testing.T) {
 		err := fs.SetBool("name", true)
 
 		// --- Then ---
-		assert.ErrorEqual(t, "flag `name` parse error", err)
-		assert.Equal(t, 0, fs.GetInt("name"))
-		assert.Equal(t, "0", fs.Lookup("name").Value.String())
+		assert.ErrorEqual(t, "flag `name` is not a bool", err)
+		assert.Equal(t, 42, fs.GetInt("name"))
+		assert.Equal(t, "42", fs.Lookup("name").Value.String())
+	})
+
+	t.Run("error - set string flag as bool", func(t *testing.T) {
+		// --- Given ---
+		fs := NewFlagSet("flag-set", flag.ContinueOnError)
+		fs.String("name", "abc", "usage")
+
+		// --- When ---
+		err := fs.SetBool("name", true)
+
+		// --- Then ---
+		assert.ErrorEqual(t, "flag `name` is not a bool", err)
+		assert.Equal(t, "abc", fs.GetString("name"))
 	})
 }
 
