@@ -74,6 +74,19 @@ func Test_FlagSet_Required_IsRequired(t *testing.T) {
 		assert.True(t, fs.IsRequired("name"))
 	})
 
+	t.Run("works on zero value construction", func(t *testing.T) {
+		// --- Given ---
+		ffs := flag.NewFlagSet("flag-set", flag.ContinueOnError)
+		fs := &FlagSet{FlagSet: ffs}
+		fs.String("name", "abc", "usage")
+
+		// --- When ---
+		fs.Required("name")
+
+		// --- Then ---
+		assert.True(t, fs.IsRequired("name"))
+	})
+
 	t.Run("error - when called with a not existing flag", func(t *testing.T) {
 		// --- Given ---
 		fs := NewFlagSet("flag-set", flag.ContinueOnError)

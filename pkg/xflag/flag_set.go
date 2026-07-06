@@ -46,6 +46,9 @@ func (fs *FlagSet) Required(name string) {
 	if long := IsAlias(flg.Usage); long != "" {
 		panic(fmt.Sprintf("flag %#q is an alias for flag %#q", name, long))
 	}
+	if fs.req == nil {
+		fs.req = make(map[string]bool)
+	}
 	fs.req[name] = true
 }
 
