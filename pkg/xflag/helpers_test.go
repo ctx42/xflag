@@ -155,7 +155,7 @@ func Test_SL_tabular(t *testing.T) {
 			}
 			fs.FlagSet.VisitAll(fn)
 			assert.Equal(t, []string{"n", "name"}, names)
-			assert.Equal(t, []string{"~~alias~for~~:name", "usage"}, usages)
+			assert.Equal(t, []string{AliasFor + "name", "usage"}, usages)
 		})
 	}
 }
