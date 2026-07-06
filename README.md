@@ -71,12 +71,12 @@ The `*SL` constructors register a long and a short name backed by a single
 value, so `-v` and `--verbose` are interchangeable. They return the pointer
 backing both names, so the value can be read directly instead of by string key:
 
-<!-- gmdoceg:pkg/xflag/ExampleBoolSL -->
+<!-- gmdoceg:pkg/xflag/ExampleFlagSet_BoolSL -->
 ```go
 fs := xflag.NewFlagSet("example", flag.ContinueOnError)
 // The *SL constructors return the pointer backing both names, so the
 // value can be read directly instead of by string key.
-verbose := xflag.BoolSL(fs.FlagSet, "verbose", "v", false, "enable verbose output")
+verbose := fs.BoolSL("verbose", "v", false, "enable verbose output")
 
 _ = fs.Parse([]string{"-v"})
 
@@ -91,8 +91,8 @@ line, instead of the two separate entries stdlib would print:
 <!-- gmdoceg:pkg/xflag/ExampleHelpOptions -->
 ```go
 fs := xflag.NewFlagSet("example", flag.ContinueOnError)
-xflag.StringSL(fs.FlagSet, "name", "n", "", "the name to greet")
-xflag.BoolSL(fs.FlagSet, "verbose", "v", false, "enable verbose output")
+fs.StringSL("name", "n", "", "the name to greet")
+fs.BoolSL("verbose", "v", false, "enable verbose output")
 
 fmt.Print(xflag.HelpOptions(fs))
 // Output:
@@ -155,10 +155,11 @@ top of it:
   `GetFloat64`, `GetDuration`.
 - **Typed setters** (error on an unknown or mismatched flag) — `SetBool`,
   `SetString`; low-level access via `Getter` and `Valuer`.
-- **Long/short aliases** — the `*SL` constructors `BoolSL`, `IntSL`, `Int64SL`,
-  `Uint64SL`, `StringSL`, `Float64SL`, `DurationSL`, `FuncSL`, rendered by
-  `HelpOptions` / `HelpOptionLines`. Each (except `FuncSL`) returns the pointer
-  backing both names, mirroring stdlib `flag.Bool`.
+- **Long/short aliases** — the `*SL` constructor methods `BoolSL`, `IntSL`,
+  `Int64SL`, `Uint64SL`, `StringSL`, `Float64SL`, `DurationSL`, `FuncSL`,
+  rendered by `HelpOptions` / `HelpOptionLines`. Each (except `FuncSL`) returns
+  the pointer backing both names, mirroring stdlib `flag.Bool`. The
+  package-level free-func forms remain as deprecated shims.
 
 Full API docs: [pkg.go.dev/github.com/ctx42/xflag/pkg/xflag](https://pkg.go.dev/github.com/ctx42/xflag/pkg/xflag).
 

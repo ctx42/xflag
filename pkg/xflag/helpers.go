@@ -79,7 +79,7 @@ func IsAlias(usage string) string {
 
 // BoolSL adds a bool flag with long and short names to the flag set and returns
 // the pointer that stores its value. The long and short names share the pointer.
-func BoolSL(fs *flag.FlagSet, long, short string, value bool, usage string) *bool {
+func (fs *FlagSet) BoolSL(long, short string, value bool, usage string) *bool {
 	val := fs.Bool(long, value, usage)
 	fs.BoolVar(val, short, value, AliasFor+long)
 	return val
@@ -87,7 +87,7 @@ func BoolSL(fs *flag.FlagSet, long, short string, value bool, usage string) *boo
 
 // IntSL adds an int flag with long and short names to the flag set and returns
 // the pointer that stores its value. The long and short names share the pointer.
-func IntSL(fs *flag.FlagSet, long, short string, value int, usage string) *int {
+func (fs *FlagSet) IntSL(long, short string, value int, usage string) *int {
 	val := fs.Int(long, value, usage)
 	fs.IntVar(val, short, value, AliasFor+long)
 	return val
@@ -96,7 +96,7 @@ func IntSL(fs *flag.FlagSet, long, short string, value int, usage string) *int {
 // Int64SL adds a 64bit int flag with long and short names to the flag set and
 // returns the pointer that stores its value. The long and short names share the
 // pointer.
-func Int64SL(fs *flag.FlagSet, long, short string, value int64, usage string) *int64 {
+func (fs *FlagSet) Int64SL(long, short string, value int64, usage string) *int64 {
 	val := fs.Int64(long, value, usage)
 	fs.Int64Var(val, short, value, AliasFor+long)
 	return val
@@ -105,8 +105,7 @@ func Int64SL(fs *flag.FlagSet, long, short string, value int64, usage string) *i
 // Uint64SL adds an unsigned 64-bit int flag with long and short names to the
 // flag set and returns the pointer that stores its value. The long and short
 // names share the pointer.
-func Uint64SL(
-	fs *flag.FlagSet,
+func (fs *FlagSet) Uint64SL(
 	long, short string,
 	value uint64,
 	usage string,
@@ -120,7 +119,7 @@ func Uint64SL(
 // StringSL adds a string flag with long and short names to the flag set and
 // returns the pointer that stores its value. The long and short names share the
 // pointer.
-func StringSL(fs *flag.FlagSet, long, short, value, usage string) *string {
+func (fs *FlagSet) StringSL(long, short, value, usage string) *string {
 	val := fs.String(long, value, usage)
 	fs.StringVar(val, short, value, AliasFor+long)
 	return val
@@ -129,8 +128,7 @@ func StringSL(fs *flag.FlagSet, long, short, value, usage string) *string {
 // Float64SL adds a 64bit float flag with long and short names to the flag set
 // and returns the pointer that stores its value. The long and short names share
 // the pointer.
-func Float64SL(
-	fs *flag.FlagSet,
+func (fs *FlagSet) Float64SL(
 	long, short string,
 	value float64,
 	usage string,
@@ -144,8 +142,7 @@ func Float64SL(
 // DurationSL adds a duration flag with long and short names to the flag set and
 // returns the pointer that stores its value. The long and short names share the
 // pointer.
-func DurationSL(
-	fs *flag.FlagSet,
+func (fs *FlagSet) DurationSL(
 	long, short string,
 	value time.Duration,
 	usage string,
@@ -157,12 +154,7 @@ func DurationSL(
 }
 
 // FuncSL adds a "function" flag with long and short names to the flag set.
-func FuncSL(
-	fs *flag.FlagSet,
-	long, short, usage string,
-	fn func(string) error,
-) {
-
+func (fs *FlagSet) FuncSL(long, short, usage string, fn func(string) error) {
 	fs.Func(long, usage, fn)
 	fs.Func(short, AliasFor+long, fn)
 }

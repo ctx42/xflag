@@ -102,39 +102,39 @@ func Test_SL_tabular(t *testing.T) {
 	tt := []struct {
 		testN string
 
-		fnSL func(*flag.FlagSet)
+		fnSL func(*FlagSet)
 	}{
 		{
 			"BoolSL",
-			func(fs *flag.FlagSet) { BoolSL(fs, "name", "n", true, "usage") },
+			func(fs *FlagSet) { fs.BoolSL("name", "n", true, "usage") },
 		},
 		{
 			"IntSL",
-			func(fs *flag.FlagSet) { IntSL(fs, "name", "n", 1, "usage") },
+			func(fs *FlagSet) { fs.IntSL("name", "n", 1, "usage") },
 		},
 		{
 			"Int64SL",
-			func(fs *flag.FlagSet) { Int64SL(fs, "name", "n", 1, "usage") },
+			func(fs *FlagSet) { fs.Int64SL("name", "n", 1, "usage") },
 		},
 		{
 			"Uint64SL",
-			func(fs *flag.FlagSet) { Uint64SL(fs, "name", "n", 1, "usage") },
+			func(fs *FlagSet) { fs.Uint64SL("name", "n", 1, "usage") },
 		},
 		{
 			"StringSL",
-			func(fs *flag.FlagSet) { StringSL(fs, "name", "n", "a", "usage") },
+			func(fs *FlagSet) { fs.StringSL("name", "n", "a", "usage") },
 		},
 		{
 			"Float64SL",
-			func(fs *flag.FlagSet) { Float64SL(fs, "name", "n", 1, "usage") },
+			func(fs *FlagSet) { fs.Float64SL("name", "n", 1, "usage") },
 		},
 		{
 			"DurationSL",
-			func(fs *flag.FlagSet) { DurationSL(fs, "name", "n", 1, "usage") },
+			func(fs *FlagSet) { fs.DurationSL("name", "n", 1, "usage") },
 		},
 		{
 			"FuncSL",
-			func(fs *flag.FlagSet) { FuncSL(fs, "name", "n", "usage", fn) },
+			func(fs *FlagSet) { fs.FuncSL("name", "n", "usage", fn) },
 		},
 	}
 
@@ -144,7 +144,7 @@ func Test_SL_tabular(t *testing.T) {
 			fs := NewFlagSet("flg-set", flag.ContinueOnError)
 
 			// --- When ---
-			tc.fnSL(fs.FlagSet)
+			tc.fnSL(fs)
 
 			// --- Then ---
 			var names []string
@@ -164,7 +164,7 @@ func Test_SL_returnsBoundPointer(t *testing.T) {
 	t.Run("pointer reflects the long flag after Parse", func(t *testing.T) {
 		// --- Given ---
 		fs := NewFlagSet("flg-set", flag.ContinueOnError)
-		got := StringSL(fs.FlagSet, "name", "n", "default", "usage")
+		got := fs.StringSL("name", "n", "default", "usage")
 
 		// --- When ---
 		err := fs.Parse([]string{"--name", "long"})
@@ -177,7 +177,7 @@ func Test_SL_returnsBoundPointer(t *testing.T) {
 	t.Run("pointer reflects the short flag after Parse", func(t *testing.T) {
 		// --- Given ---
 		fs := NewFlagSet("flg-set", flag.ContinueOnError)
-		got := BoolSL(fs.FlagSet, "verbose", "v", false, "usage")
+		got := fs.BoolSL("verbose", "v", false, "usage")
 
 		// --- When ---
 		err := fs.Parse([]string{"-v"})
@@ -190,7 +190,7 @@ func Test_SL_returnsBoundPointer(t *testing.T) {
 	t.Run("long and short share the pointer", func(t *testing.T) {
 		// --- Given ---
 		fs := NewFlagSet("flg-set", flag.ContinueOnError)
-		got := IntSL(fs.FlagSet, "num", "n", 0, "usage")
+		got := fs.IntSL("num", "n", 0, "usage")
 
 		// --- When ---
 		err := fs.Parse([]string{"--num", "1", "-n", "2"})

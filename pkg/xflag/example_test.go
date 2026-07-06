@@ -62,11 +62,11 @@ func ExampleFlagSet_CheckRequired() {
 	// `token` flag is required
 }
 
-func ExampleBoolSL() {
+func ExampleFlagSet_BoolSL() {
 	fs := xflag.NewFlagSet("example", flag.ContinueOnError)
 	// The *SL constructors return the pointer backing both names, so the
 	// value can be read directly instead of by string key.
-	verbose := xflag.BoolSL(fs.FlagSet, "verbose", "v", false, "enable verbose output")
+	verbose := fs.BoolSL("verbose", "v", false, "enable verbose output")
 
 	_ = fs.Parse([]string{"-v"})
 
@@ -77,8 +77,8 @@ func ExampleBoolSL() {
 
 func ExampleHelpOptions() {
 	fs := xflag.NewFlagSet("example", flag.ContinueOnError)
-	xflag.StringSL(fs.FlagSet, "name", "n", "", "the name to greet")
-	xflag.BoolSL(fs.FlagSet, "verbose", "v", false, "enable verbose output")
+	fs.StringSL("name", "n", "", "the name to greet")
+	fs.BoolSL("verbose", "v", false, "enable verbose output")
 
 	fmt.Print(xflag.HelpOptions(fs))
 	// Output:
