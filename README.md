@@ -8,14 +8,15 @@ an existing program and reach for the extras only when you need them.
 
 ## Features
 
-| Feature            | What it adds                                          |
-|--------------------|-------------------------------------------------------|
-| Drop-in `FlagSet`  | Embeds `*flag.FlagSet`; stdlib methods still work.    |
-| Required flags     | Mark `Required`; catch unset flags after parsing.     |
-| Typed accessors    | Get/set without casting: `GetInt`, `SetBool`, etc.    |
-| Long/short aliases | `*SL` binds `--name`/`-n`, returns the value pointer. |
-| Alias-aware help   | `HelpOptions` folds each alias onto one help line.    |
-| `WasSet`           | Tell an explicitly-set flag from a default value.     |
+| Feature            | What it adds                                            |
+|--------------------|---------------------------------------------------------|
+| Drop-in `FlagSet`  | Embeds `*flag.FlagSet`; stdlib methods still work.      |
+| Required flags     | Mark `Required`; catch unset flags after parsing.       |
+| Typed accessors    | Get/set without casting: `GetInt`, `SetBool`, etc.      |
+| Long/short aliases | `*SL` binds `--name`/`-n`, returns the value pointer.   |
+| Alias-aware help   | `HelpOptions` folds each alias onto one help line.      |
+| `WasSet`           | Tell an explicitly-set flag from a default value.       |
+| Typed parse errors | `Parse` failures wrap in `*ParseError` for `errors.As`. |
 
 ## Install
 
@@ -143,6 +144,28 @@ fmt.Println(fs.WasSet("port")) // ...but the flag was never set.
 // false
 ```
 
+### Typed parse errors
+
+`Parse` wraps a failure in a `*ParseError` naming the offending flag and value,
+so you can react with `errors.As` instead of matching stdlib error strings.
+`flag.ErrHelp` still passes through unwrapped:
+
+<!-- gmdoceg:pkg/xflag/ExampleFlagSet_Parse -->
+```go
+fs := xflag.NewFlagSet("example", flag.ContinueOnError)
+fs.SetOutput(io.Discard) // Silence the standard usage output.
+fs.Int("timeout", 0, "seconds to wait")
+
+err := fs.Parse([]string{"-timeout", "soon"})
+
+// errors.As recovers the flag and value without matching error strings.
+if pe, ok := errors.AsType[*xflag.ParseError](err); ok {
+	fmt.Printf("flag %q rejected value %q\n", pe.Flag, pe.Value)
+}
+// Output:
+// flag "timeout" rejected value "soon"
+```
+
 ## API reference
 
 `FlagSet` embeds `*flag.FlagSet`, so the entire stdlib API stays available. On
@@ -158,8 +181,10 @@ top of it:
 - **Long/short aliases** — the `*SL` constructor methods `BoolSL`, `IntSL`,
   `Int64SL`, `Uint64SL`, `StringSL`, `Float64SL`, `DurationSL`, `FuncSL`,
   rendered by `HelpOptions` / `HelpOptionLines`. Each (except `FuncSL`) returns
-  the pointer backing both names, mirroring stdlib `flag.Bool`. The
-  package-level free-func forms remain as deprecated shims.
+  the pointer backing both names, mirroring stdlib `flag.Bool`.
+- **Typed parse errors** — `Parse` wraps a failure in `*ParseError` (`Flag`,
+  `Value`, `Err`); match categories with `errors.Is` against `ErrUndefinedFlag`
+  / `ErrNeedsValue`, and `flag.ErrHelp` passes through unwrapped.
 
 Full API docs: [pkg.go.dev/github.com/ctx42/xflag/pkg/xflag](https://pkg.go.dev/github.com/ctx42/xflag/pkg/xflag).
 

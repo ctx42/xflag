@@ -1,8 +1,10 @@
 package xflag_test
 
 import (
+	"errors"
 	"flag"
 	"fmt"
+	"io"
 
 	"github.com/ctx42/xflag/pkg/xflag"
 )
@@ -73,6 +75,21 @@ func ExampleFlagSet_BoolSL() {
 	fmt.Println(*verbose)
 	// Output:
 	// true
+}
+
+func ExampleFlagSet_Parse() {
+	fs := xflag.NewFlagSet("example", flag.ContinueOnError)
+	fs.SetOutput(io.Discard) // Silence the standard usage output.
+	fs.Int("timeout", 0, "seconds to wait")
+
+	err := fs.Parse([]string{"-timeout", "soon"})
+
+	// errors.As recovers the flag and value without matching error strings.
+	if pe, ok := errors.AsType[*xflag.ParseError](err); ok {
+		fmt.Printf("flag %q rejected value %q\n", pe.Flag, pe.Value)
+	}
+	// Output:
+	// flag "timeout" rejected value "soon"
 }
 
 func ExampleHelpOptions() {

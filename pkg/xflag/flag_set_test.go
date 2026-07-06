@@ -1,7 +1,9 @@
 package xflag
 
 import (
+	"errors"
 	"flag"
+	"io"
 	"testing"
 	"time"
 
@@ -212,6 +214,55 @@ func Test_FlagSet_CheckRequired(t *testing.T) {
 	})
 }
 
+func Test_ParseError_Error(t *testing.T) {
+	t.Run("preserves the original flag package message", func(t *testing.T) {
+		// --- Given ---
+		fs := NewFlagSet("flag-set", flag.ContinueOnError)
+		fs.Int("num", 0, "usage")
+
+		// --- When ---
+		err := fs.Parse([]string{"--num", "abc"})
+
+		// --- Then ---
+		wMsg := `invalid value "abc" for flag -num: parse error`
+		assert.ErrorEqual(t, wMsg, err)
+	})
+
+	t.Run("reconstructs a value error without an original message", func(t *testing.T) {
+		// --- Given ---
+		pe := &ParseError{Flag: "num", Value: "abc", Err: errors.New("bad")}
+
+		// --- When ---
+		have := pe.Error()
+
+		// --- Then ---
+		assert.Equal(t, `invalid value "abc" for flag "num": bad`, have)
+	})
+
+	t.Run("reconstructs a category error without an original message", func(t *testing.T) {
+		// --- Given ---
+		pe := &ParseError{Flag: "num", Err: ErrUndefinedFlag}
+
+		// --- When ---
+		have := pe.Error()
+
+		// --- Then ---
+		assert.Equal(t, `flag provided but not defined: "num"`, have)
+	})
+}
+
+func Test_ParseError_Unwrap(t *testing.T) {
+	// --- Given ---
+	cause := errors.New("boom")
+	pe := &ParseError{Flag: "num", Err: cause}
+
+	// --- When ---
+	have := pe.Unwrap()
+
+	// --- Then ---
+	assert.Same(t, cause, have)
+}
+
 func Test_FlagSet_Parse(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		// --- Given ---
@@ -228,7 +279,7 @@ func Test_FlagSet_Parse(t *testing.T) {
 		assert.Equal(t, "xyz", fs.GetString("name0"))
 	})
 
-	t.Run("error - parsing", func(t *testing.T) {
+	t.Run("error - bad value yields a ParseError", func(t *testing.T) {
 		// --- Given ---
 		fs := NewFlagSet("flag-set", flag.ContinueOnError)
 		fs.Int("name0", 123, "usage0")
@@ -237,10 +288,101 @@ func Test_FlagSet_Parse(t *testing.T) {
 		err := fs.Parse([]string{"--name0", "abc"})
 
 		// --- Then ---
-		wMsg := `invalid value "abc" for flag -name0: parse error`
-		assert.ErrorEqual(t, wMsg, err)
+		var pe *ParseError
+		assert.ErrorAs(t, &pe, err)
+		assert.Equal(t, "name0", pe.Flag)
+		assert.Equal(t, "abc", pe.Value)
+		assert.Equal(t, "parse error", pe.Err.Error())
 		assert.Equal(t, 0, fs.GetInt("name0"))
 	})
+
+	t.Run("error - bad bool value yields a ParseError", func(t *testing.T) {
+		// --- Given ---
+		fs := NewFlagSet("flag-set", flag.ContinueOnError)
+		fs.Bool("verbose", false, "usage")
+
+		// --- When ---
+		err := fs.Parse([]string{"-verbose=notabool"})
+
+		// --- Then ---
+		var pe *ParseError
+		assert.ErrorAs(t, &pe, err)
+		assert.Equal(t, "verbose", pe.Flag)
+		assert.Equal(t, "notabool", pe.Value)
+	})
+
+	t.Run("error - undefined flag", func(t *testing.T) {
+		// --- Given ---
+		fs := NewFlagSet("flag-set", flag.ContinueOnError)
+		fs.Int("num", 0, "usage")
+
+		// --- When ---
+		err := fs.Parse([]string{"--nope", "1"})
+
+		// --- Then ---
+		var pe *ParseError
+		assert.ErrorAs(t, &pe, err)
+		assert.Equal(t, "nope", pe.Flag)
+		assert.Empty(t, pe.Value)
+		assert.ErrorIs(t, ErrUndefinedFlag, err)
+	})
+
+	t.Run("error - flag needs an argument", func(t *testing.T) {
+		// --- Given ---
+		fs := NewFlagSet("flag-set", flag.ContinueOnError)
+		fs.Int("num", 0, "usage")
+
+		// --- When ---
+		err := fs.Parse([]string{"--num"})
+
+		// --- Then ---
+		var pe *ParseError
+		assert.ErrorAs(t, &pe, err)
+		assert.Equal(t, "num", pe.Flag)
+		assert.ErrorIs(t, ErrNeedsValue, err)
+	})
+
+	t.Run("help request passes through unwrapped", func(t *testing.T) {
+		// --- Given ---
+		fs := NewFlagSet("flag-set", flag.ContinueOnError)
+		fs.SetOutput(io.Discard)
+		fs.Int("num", 0, "usage")
+
+		// --- When ---
+		err := fs.Parse([]string{"-h"})
+
+		// --- Then ---
+		assert.ErrorIs(t, flag.ErrHelp, err)
+		var pe *ParseError
+		assert.False(t, errors.As(err, &pe))
+	})
+}
+
+func Test_wrapParseError_tabular(t *testing.T) {
+	tt := []struct {
+		testN string
+
+		msg string
+	}{
+		{"unrecognized message", "something unexpected"},
+		{
+			"bad value that is not quoted",
+			"invalid value x for flag -n: parse error",
+		},
+	}
+
+	for _, tc := range tt {
+		t.Run(tc.testN, func(t *testing.T) {
+			// --- Given ---
+			err := errors.New(tc.msg)
+
+			// --- When ---
+			have := wrapParseError(err)
+
+			// --- Then ---
+			assert.Same(t, err, have)
+		})
+	}
 }
 
 func Test_FlagSet_VisitAll(t *testing.T) {

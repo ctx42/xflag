@@ -5,11 +5,22 @@ import (
 	"flag"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 )
 
 // ErrReqFlag is returned if a required flag has not been set.
 var ErrReqFlag = errors.New("flag is required")
+
+// Parse error causes reported through [ParseError.Err] and matchable with
+// [errors.Is].
+var (
+	// ErrUndefinedFlag is the cause when an argument names an unknown flag.
+	ErrUndefinedFlag = errors.New("flag provided but not defined")
+
+	// ErrNeedsValue is the cause when a flag is given without its argument.
+	ErrNeedsValue = errors.New("flag needs an argument")
+)
 
 // FlagSet represents program flags.
 type FlagSet struct {
@@ -41,6 +52,116 @@ func (fs *FlagSet) recordAlias(short, long string) {
 		fs.aliasOf = make(map[string]string)
 	}
 	fs.aliasOf[short] = long
+}
+
+// ParseError is returned by [FlagSet.Parse] when parsing an argument fails. It
+// exposes the offending flag and value so callers can react without matching
+// error strings; retrieve it with [errors.As].
+type ParseError struct {
+	// Flag is the flag name that failed, without leading dashes.
+	Flag string
+
+	// Value is the offending value, empty when the failure carries none (an
+	// undefined flag or a flag missing its argument).
+	Value string
+
+	// Err is the underlying cause. For an unparsable value it is the flag
+	// package's message; for the other cases it is [ErrUndefinedFlag] or
+	// [ErrNeedsValue].
+	Err error
+
+	// msg is the original flag package message, preserved so Error reads
+	// exactly as the standard library's did.
+	msg string
+}
+
+// Error returns the original flag package message; a manually built value
+// without one falls back to a reconstruction.
+func (pe *ParseError) Error() string {
+	if pe.msg != "" {
+		return pe.msg
+	}
+	if errors.Is(pe.Err, ErrUndefinedFlag) || errors.Is(pe.Err, ErrNeedsValue) {
+		return fmt.Sprintf("%v: %q", pe.Err, pe.Flag)
+	}
+	const format = "invalid value %q for flag %q: %v"
+	return fmt.Sprintf(format, pe.Value, pe.Flag, pe.Err)
+}
+
+// Unwrap returns the underlying cause, enabling [errors.Is] and [errors.As].
+func (pe *ParseError) Unwrap() error { return pe.Err }
+
+// Parse parses flag definitions from the argument list like
+// [flag.FlagSet.Parse], but wraps a parse failure in a [ParseError] that names
+// the offending flag and value. [flag.ErrHelp] is returned unwrapped, so
+// errors.Is(err, flag.ErrHelp) keeps working. Wrapping happens only under
+// [flag.ContinueOnError]; the ExitOnError and PanicOnError modes exit or panic
+// inside the embedded parser before this method can wrap.
+func (fs *FlagSet) Parse(arguments []string) error {
+	err := fs.FlagSet.Parse(arguments)
+	if err == nil || errors.Is(err, flag.ErrHelp) {
+		return err
+	}
+	return wrapParseError(err)
+}
+
+// wrapParseError converts a standard library flag parse error into a
+// [ParseError]. It returns err unchanged when the message is not a known form.
+func wrapParseError(err error) error {
+	msg := err.Error()
+
+	// The bad-value message differs for bool flags ("invalid boolean value
+	// ... for -name") from every other type ("invalid value ... for flag
+	// -name").
+	if pe := invalidValueError(msg, "invalid value ", " for flag -"); pe != nil {
+		return pe
+	}
+	if pe := invalidValueError(msg, "invalid boolean value ", " for -"); pe != nil {
+		return pe
+	}
+
+	if name, ok := strings.CutPrefix(
+		msg,
+		"flag provided but not defined: -",
+	); ok {
+		return &ParseError{Flag: name, Err: ErrUndefinedFlag, msg: msg}
+	}
+	if name, ok := strings.CutPrefix(msg, "flag needs an argument: -"); ok {
+		return &ParseError{Flag: name, Err: ErrNeedsValue, msg: msg}
+	}
+
+	return err
+}
+
+// invalidValueError parses a flag bad-value message shaped as
+// prefix + quoted-value + sep + name + ": " + cause. It returns nil when msg
+// does not match that shape.
+func invalidValueError(msg, prefix, sep string) *ParseError {
+	rest, ok := strings.CutPrefix(msg, prefix)
+	if !ok {
+		return nil
+	}
+	quoted, err := strconv.QuotedPrefix(rest)
+	if err != nil {
+		return nil
+	}
+	value, err := strconv.Unquote(quoted)
+	if err != nil {
+		return nil
+	}
+	if rest, ok = strings.CutPrefix(rest[len(quoted):], sep); !ok {
+		return nil
+	}
+	name, cause, ok := strings.Cut(rest, ": ")
+	if !ok {
+		return nil
+	}
+	return &ParseError{
+		Flag:  name,
+		Value: value,
+		Err:   errors.New(cause),
+		msg:   msg,
+	}
 }
 
 // Required marks a flag name as required. It must be called before parsing and
