@@ -660,9 +660,22 @@ func Test_FlagSet_SetString(t *testing.T) {
 		err := fs.SetString("name", "abc")
 
 		// --- Then ---
-		assert.ErrorEqual(t, "flag `name` parse error", err)
-		assert.Equal(t, 0, fs.GetInt("name"))
-		assert.Equal(t, "0", fs.Lookup("name").Value.String())
+		assert.ErrorEqual(t, "flag `name` is not a string", err)
+		assert.Equal(t, 42, fs.GetInt("name"))
+		assert.Equal(t, "42", fs.Lookup("name").Value.String())
+	})
+
+	t.Run("error - int flag with parseable value", func(t *testing.T) {
+		// --- Given ---
+		fs := NewFlagSet("flag-set", flag.ContinueOnError)
+		fs.Int("name", 42, "usage")
+
+		// --- When ---
+		err := fs.SetString("name", "123")
+
+		// --- Then ---
+		assert.ErrorEqual(t, "flag `name` is not a string", err)
+		assert.Equal(t, 42, fs.GetInt("name"))
 	})
 }
 

@@ -206,13 +206,21 @@ func (fs *FlagSet) GetString(name string) string {
 // SetString sets the value of a string flag identified by `name`. If the flag
 // is not of type `string` or does not exist, it returns an error.
 func (fs *FlagSet) SetString(name, value string) error {
-	if flg := fs.Lookup(name); flg != nil {
-		if err := flg.Value.Set(value); err != nil {
-			return fmt.Errorf("flag %#q %w", name, err)
-		}
-		return nil
+	flg := fs.Lookup(name)
+	if flg == nil {
+		return fmt.Errorf("cannot set not existing flag %q", name)
 	}
-	return fmt.Errorf("cannot set not existing flag %q", name)
+	get, ok := flg.Value.(flag.Getter)
+	if !ok {
+		return fmt.Errorf("flag %#q is not a string", name)
+	}
+	if _, ok := get.Get().(string); !ok {
+		return fmt.Errorf("flag %#q is not a string", name)
+	}
+	if err := flg.Value.Set(value); err != nil {
+		return fmt.Errorf("flag %#q %w", name, err)
+	}
+	return nil
 }
 
 // GetFloat64 returns the parsed (or default) value of the float64 flag.
