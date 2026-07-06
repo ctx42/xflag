@@ -228,7 +228,7 @@ func Test_ParseError_Error(t *testing.T) {
 		assert.ErrorEqual(t, wMsg, err)
 	})
 
-	t.Run("reconstructs a value error without an original message", func(t *testing.T) {
+	t.Run("value error without original message", func(t *testing.T) {
 		// --- Given ---
 		pe := &ParseError{Flag: "num", Value: "abc", Err: errors.New("bad")}
 
@@ -239,7 +239,7 @@ func Test_ParseError_Error(t *testing.T) {
 		assert.Equal(t, `invalid value "abc" for flag "num": bad`, have)
 	})
 
-	t.Run("reconstructs a category error without an original message", func(t *testing.T) {
+	t.Run("category error without original message", func(t *testing.T) {
 		// --- Given ---
 		pe := &ParseError{Flag: "num", Err: ErrUndefinedFlag}
 
