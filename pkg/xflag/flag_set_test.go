@@ -532,6 +532,7 @@ func Test_FlagSet_CheckRequired(t *testing.T) {
 		err := fs.CheckRequired()
 
 		// --- Then ---
+		assert.ErrorIs(t, ErrNotParsed, err)
 		assert.ErrorEqual(t, "flags not yet parsed", err)
 	})
 }

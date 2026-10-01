@@ -27,7 +27,8 @@ files split the responsibilities:
 - **`pkg/xflag/flag_set.go`** — `FlagSet` embeds `*flag.FlagSet` and adds:
   - **Required flags**: `Required(name)` (panics if parsed already, flag
     unknown, or an alias), `IsRequired`, and `CheckRequired` (returns
-    `ErrReqFlag` for the first missing flag by name, call after parsing).
+    `ErrReqFlag` for the first missing flag by name, or `ErrNotParsed` when
+    called before parsing).
   - **Parse errors**: `Parse` wraps failures in `*ParseError` with causes
     `ErrUndefinedFlag`, `ErrNeedsValue`, `ErrBadSyntax` or the value error.
   - **Typed accessors**: `GetBool/GetInt/GetInt64/GetUint/GetUint64/GetString/

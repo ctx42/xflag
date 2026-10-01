@@ -11,8 +11,14 @@ import (
 	"time"
 )
 
-// ErrReqFlag is returned if a required flag has not been set.
-var ErrReqFlag = errors.New("flag is required")
+// Errors returned by [FlagSet.CheckRequired].
+var (
+	// ErrReqFlag is returned if a required flag has not been set.
+	ErrReqFlag = errors.New("flag is required")
+
+	// ErrNotParsed is returned when the flags have not been parsed yet.
+	ErrNotParsed = errors.New("flags not yet parsed")
+)
 
 // Compile-time check that ParseError implements the error interface.
 var _ error = (*ParseError)(nil)
@@ -239,10 +245,11 @@ func (fs *FlagSet) IsRequired(name string) bool {
 }
 
 // CheckRequired checks all required flags were set. Returns [ErrReqFlag]
-// wrapping the lexicographically first required flag that has not been set.
+// wrapping the lexicographically first required flag that has not been set,
+// or [ErrNotParsed] when called before parsing.
 func (fs *FlagSet) CheckRequired() error {
 	if !fs.Parsed() {
-		return errors.New("flags not yet parsed")
+		return ErrNotParsed
 	}
 	for _, name := range slices.Sorted(maps.Keys(fs.req)) {
 		if fs.req[name] && !fs.WasSet(name) {
