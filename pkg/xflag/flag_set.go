@@ -4,6 +4,8 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"maps"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -233,23 +235,22 @@ func (fs *FlagSet) VisitAll(fn func(*flag.Flag)) {
 	})
 }
 
-// Visit visits the flags in lexicographical order, calling fn for each. It
-// visits only those flags that have been set and skips flags which are aliases,
-// resolving each alias to its long flag and visiting that flag at most once.
+// Visit visits the flags that have been set, calling fn for each. An alias is
+// resolved to its long flag, each flag is visited at most once, and the order
+// is lexicographical by the long flag name.
 func (fs *FlagSet) Visit(fn func(*flag.Flag)) {
-	seen := make(map[string]bool)
+	set := make(map[string]*flag.Flag)
 	fs.FlagSet.Visit(func(flg *flag.Flag) {
 		if long := fs.aliasOf[flg.Name]; long != "" {
 			if flg = fs.Lookup(long); flg == nil {
 				return
 			}
 		}
-		if seen[flg.Name] {
-			return
-		}
-		seen[flg.Name] = true
-		fn(flg)
+		set[flg.Name] = flg
 	})
+	for _, name := range slices.Sorted(maps.Keys(set)) {
+		fn(set[name])
+	}
 }
 
 // WasSet returns true if the flag name (not alias) was set.

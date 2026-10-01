@@ -528,6 +528,23 @@ func Test_FlagSet_Visit(t *testing.T) {
 		assert.Equal(t, []string{"flg-a"}, have)
 	})
 
+	t.Run("alias visited in long flag order", func(t *testing.T) {
+		// --- Given ---
+		fs := NewFlagSet("flag-set", flag.ContinueOnError)
+		fs.StringSL("zeta", "a", "zeta-def", "zeta help")
+		fs.String("flg-b", "flg-b-def", "flg-b help")
+		must.Nil(fs.Parse([]string{"-a", "abc", "--flg-b", "xyz"}))
+
+		var have []string
+		fn := func(flg *flag.Flag) { have = append(have, flg.Name) }
+
+		// --- When ---
+		fs.Visit(fn)
+
+		// --- Then ---
+		assert.Equal(t, []string{"flg-b", "zeta"}, have)
+	})
+
 	t.Run("alias to missing long flag is skipped", func(t *testing.T) {
 		// --- Given ---
 		fs := NewFlagSet("flag-set", flag.ContinueOnError)
