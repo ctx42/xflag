@@ -20,6 +20,10 @@ var (
 
 	// ErrNeedsValue is the cause when a flag is given without its argument.
 	ErrNeedsValue = errors.New("flag needs an argument")
+
+	// ErrBadSyntax is the cause when an argument is not a well-formed flag,
+	// such as "---x" or "-=x".
+	ErrBadSyntax = errors.New("bad flag syntax")
 )
 
 // FlagSet represents program flags.
@@ -58,16 +62,18 @@ func (fs *FlagSet) recordAlias(short, long string) {
 // exposes the offending flag and value so callers can react without matching
 // error strings; retrieve it with [errors.As].
 type ParseError struct {
-	// Flag is the flag name that failed, without leading dashes.
+	// Flag is the flag name that failed, without leading dashes; empty for
+	// [ErrBadSyntax].
 	Flag string
 
 	// Value is the offending value, empty when the failure carries none (an
-	// undefined flag or a flag missing its argument).
+	// undefined flag, a flag missing its argument, or a bool flag given
+	// without one). For [ErrBadSyntax] it is the whole malformed argument.
 	Value string
 
 	// Err is the underlying cause. For an unparsable value it is the flag
-	// package's message; for the other cases it is [ErrUndefinedFlag] or
-	// [ErrNeedsValue].
+	// package's message; for the other cases it is [ErrUndefinedFlag],
+	// [ErrNeedsValue] or [ErrBadSyntax].
 	Err error
 
 	// msg is the original flag package message, preserved so Error reads
@@ -80,6 +86,9 @@ type ParseError struct {
 func (pe *ParseError) Error() string {
 	if pe.msg != "" {
 		return pe.msg
+	}
+	if errors.Is(pe.Err, ErrBadSyntax) {
+		return fmt.Sprintf("%v: %s", pe.Err, pe.Value)
 	}
 	if errors.Is(pe.Err, ErrUndefinedFlag) || errors.Is(pe.Err, ErrNeedsValue) {
 		return fmt.Sprintf("%v: %q", pe.Err, pe.Flag)
@@ -128,6 +137,17 @@ func wrapParseError(err error) error {
 	}
 	if name, ok := strings.CutPrefix(msg, "flag needs an argument: -"); ok {
 		return &ParseError{Flag: name, Err: ErrNeedsValue, msg: msg}
+	}
+	if arg, ok := strings.CutPrefix(msg, "bad flag syntax: "); ok {
+		return &ParseError{Value: arg, Err: ErrBadSyntax, msg: msg}
+	}
+
+	// A bool flag given without a value whose Set("true") fails, e.g. a
+	// [flag.FlagSet.BoolFunc] returning an error.
+	if rest, ok := strings.CutPrefix(msg, "invalid boolean flag "); ok {
+		if name, cause, ok := strings.Cut(rest, ": "); ok {
+			return &ParseError{Flag: name, Err: errors.New(cause), msg: msg}
+		}
 	}
 
 	return err

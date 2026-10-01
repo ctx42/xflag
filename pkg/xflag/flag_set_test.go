@@ -249,6 +249,17 @@ func Test_ParseError_Error(t *testing.T) {
 		// --- Then ---
 		assert.Equal(t, `flag provided but not defined: "num"`, have)
 	})
+
+	t.Run("bad syntax error without original message", func(t *testing.T) {
+		// --- Given ---
+		pe := &ParseError{Value: "-=x", Err: ErrBadSyntax}
+
+		// --- When ---
+		have := pe.Error()
+
+		// --- Then ---
+		assert.Equal(t, "bad flag syntax: -=x", have)
+	})
 }
 
 func Test_ParseError_Unwrap(t *testing.T) {
@@ -342,6 +353,42 @@ func Test_FlagSet_Parse(t *testing.T) {
 		assert.ErrorIs(t, ErrNeedsValue, err)
 	})
 
+	t.Run("error - bool func flag fails", func(t *testing.T) {
+		// --- Given ---
+		fs := NewFlagSet("flag-set", flag.ContinueOnError)
+		fn := func(string) error { return errors.New("nope") }
+		fs.BoolFunc("verbose", "usage", fn)
+		args := []string{"-verbose"}
+
+		// --- When ---
+		err := fs.Parse(args)
+
+		// --- Then ---
+		var pe *ParseError
+		assert.ErrorAs(t, &pe, err)
+		assert.Equal(t, "verbose", pe.Flag)
+		assert.Empty(t, pe.Value)
+		assert.Equal(t, "nope", pe.Err.Error())
+		assert.ErrorEqual(t, "invalid boolean flag verbose: nope", err)
+	})
+
+	t.Run("error - bad flag syntax", func(t *testing.T) {
+		// --- Given ---
+		fs := NewFlagSet("flag-set", flag.ContinueOnError)
+		args := []string{"-=x"}
+
+		// --- When ---
+		err := fs.Parse(args)
+
+		// --- Then ---
+		var pe *ParseError
+		assert.ErrorAs(t, &pe, err)
+		assert.Empty(t, pe.Flag)
+		assert.Equal(t, "-=x", pe.Value)
+		assert.ErrorIs(t, ErrBadSyntax, err)
+		assert.ErrorEqual(t, "bad flag syntax: -=x", err)
+	})
+
 	t.Run("help request passes through unwrapped", func(t *testing.T) {
 		// --- Given ---
 		fs := NewFlagSet("flag-set", flag.ContinueOnError)
@@ -369,6 +416,7 @@ func Test_wrapParseError_tabular(t *testing.T) {
 			"bad value that is not quoted",
 			"invalid value x for flag -n: parse error",
 		},
+		{"invalid boolean flag without cause", "invalid boolean flag v"},
 	}
 
 	for _, tc := range tt {
