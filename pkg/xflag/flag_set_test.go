@@ -163,6 +163,40 @@ func Test_FlagSet_Parse(t *testing.T) {
 		assert.Equal(t, 0, fs.GetInt("name0"))
 	})
 
+	t.Run("error - bad value for a flag name with colon", func(t *testing.T) {
+		// --- Given ---
+		fs := NewFlagSet("flag-set", flag.ContinueOnError)
+		fs.Int("a: b", 0, "usage")
+		args := []string{"--a: b", "x"}
+
+		// --- When ---
+		err := fs.Parse(args)
+
+		// --- Then ---
+		var pe *ParseError
+		assert.ErrorAs(t, &pe, err)
+		assert.Equal(t, "a: b", pe.Flag)
+		assert.Equal(t, "x", pe.Value)
+		assert.Equal(t, "parse error", pe.Err.Error())
+	})
+
+	t.Run("error - bool func fails for a name with colon", func(t *testing.T) {
+		// --- Given ---
+		fs := NewFlagSet("flag-set", flag.ContinueOnError)
+		fn := func(string) error { return errors.New("x: y") }
+		fs.BoolFunc("v: w", "usage", fn)
+		args := []string{"-v: w"}
+
+		// --- When ---
+		err := fs.Parse(args)
+
+		// --- Then ---
+		var pe *ParseError
+		assert.ErrorAs(t, &pe, err)
+		assert.Equal(t, "v: w", pe.Flag)
+		assert.Equal(t, "x: y", pe.Err.Error())
+	})
+
 	t.Run("error - bad bool value yields a ParseError", func(t *testing.T) {
 		// --- Given ---
 		fs := NewFlagSet("flag-set", flag.ContinueOnError)
@@ -265,7 +299,7 @@ func Test_FlagSet_Parse(t *testing.T) {
 	})
 }
 
-func Test_wrapParseError_tabular(t *testing.T) {
+func Test_FlagSet_wrapParseError_tabular(t *testing.T) {
 	tt := []struct {
 		testN string
 
@@ -284,13 +318,48 @@ func Test_wrapParseError_tabular(t *testing.T) {
 	for _, tc := range tt {
 		t.Run(tc.testN, func(t *testing.T) {
 			// --- Given ---
+			fs := NewFlagSet("flag-set", flag.ContinueOnError)
 			err := errors.New(tc.msg)
 
 			// --- When ---
-			have := wrapParseError(err)
+			have := fs.wrapParseError(err)
 
 			// --- Then ---
 			assert.Same(t, err, have)
+		})
+	}
+}
+
+func Test_FlagSet_splitNameCause_tabular(t *testing.T) {
+	tt := []struct {
+		testN string
+
+		rest   string
+		wName  string
+		wCause string
+		wOk    bool
+	}{
+		{"defined name with colon", "a: b: e", "a: b", "e", true},
+		{"first defined name wins", "c: d: e", "c", "d: e", true},
+		{"undefined name falls back", "x: y: z", "x", "y: z", true},
+		{"no separator", "abc", "abc", "", false},
+	}
+
+	for _, tc := range tt {
+		t.Run(tc.testN, func(t *testing.T) {
+			// --- Given ---
+			fs := NewFlagSet("flag-set", flag.ContinueOnError)
+			fs.Int("a: b", 0, "usage")
+			fs.Int("c", 0, "usage")
+			fs.Int("c: d", 0, "usage")
+
+			// --- When ---
+			hName, hCause, hOk := fs.splitNameCause(tc.rest)
+
+			// --- Then ---
+			assert.Equal(t, tc.wName, hName)
+			assert.Equal(t, tc.wCause, hCause)
+			assert.Equal(t, tc.wOk, hOk)
 		})
 	}
 }

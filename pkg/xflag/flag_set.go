@@ -121,12 +121,12 @@ func (fs *FlagSet) Parse(arguments []string) error {
 	if err == nil || errors.Is(err, flag.ErrHelp) {
 		return err
 	}
-	return wrapParseError(err)
+	return fs.wrapParseError(err)
 }
 
 // wrapParseError converts a standard library flag parse error into a
 // [ParseError]. It returns err unchanged when the message is not a known form.
-func wrapParseError(err error) error {
+func (fs *FlagSet) wrapParseError(err error) error {
 	msg := err.Error()
 
 	// The bad-value message differs for bool flags ("invalid boolean value
@@ -137,7 +137,7 @@ func wrapParseError(err error) error {
 		{"invalid boolean value ", " for -"},
 	}
 	for _, form := range forms {
-		if pe := invalidValueError(msg, form[0], form[1]); pe != nil {
+		if pe := fs.invalidValueError(msg, form[0], form[1]); pe != nil {
 			return pe
 		}
 	}
@@ -158,7 +158,7 @@ func wrapParseError(err error) error {
 	// A bool flag given without a value whose Set("true") fails, e.g. a
 	// [flag.FlagSet.BoolFunc] returning an error.
 	if rest, ok := strings.CutPrefix(msg, "invalid boolean flag "); ok {
-		if name, cause, ok := strings.Cut(rest, ": "); ok {
+		if name, cause, ok := fs.splitNameCause(rest); ok {
 			return &ParseError{Flag: name, Err: errors.New(cause), msg: msg}
 		}
 	}
@@ -169,7 +169,7 @@ func wrapParseError(err error) error {
 // invalidValueError parses a flag bad-value message shaped as
 // prefix + quoted-value + sep + name + ": " + cause. It returns nil when msg
 // does not match that shape.
-func invalidValueError(msg, prefix, sep string) *ParseError {
+func (fs *FlagSet) invalidValueError(msg, prefix, sep string) *ParseError {
 	rest, ok := strings.CutPrefix(msg, prefix)
 	if !ok {
 		return nil
@@ -185,7 +185,7 @@ func invalidValueError(msg, prefix, sep string) *ParseError {
 	if rest, ok = strings.CutPrefix(rest[len(quoted):], sep); !ok {
 		return nil
 	}
-	name, cause, ok := strings.Cut(rest, ": ")
+	name, cause, ok := fs.splitNameCause(rest)
 	if !ok {
 		return nil
 	}
@@ -195,6 +195,23 @@ func invalidValueError(msg, prefix, sep string) *ParseError {
 		Err:   errors.New(cause),
 		msg:   msg,
 	}
+}
+
+// splitNameCause splits rest, shaped as name + ": " + cause, at the first
+// ": " whose left side names a defined flag, since flag names may contain
+// ": " themselves. It falls back to the first ": " when none does.
+func (fs *FlagSet) splitNameCause(rest string) (string, string, bool) {
+	for i := 0; ; {
+		j := strings.Index(rest[i:], ": ")
+		if j < 0 {
+			break
+		}
+		if name := rest[:i+j]; fs.Lookup(name) != nil {
+			return name, rest[i+j+2:], true
+		}
+		i += j + 2
+	}
+	return strings.Cut(rest, ": ")
 }
 
 // Required marks a flag name as required. It must be called before parsing and
