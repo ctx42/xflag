@@ -35,7 +35,8 @@ var (
 //
 // The default usage message of the embedded flag set, printed on -h and on a
 // parse failure, lists a long flag and its short alias as two flags. Set its
-// Usage field to a function printing [HelpOptions] for alias-collapsed help.
+// Usage field to a function printing [FlagSet.HelpOptions] for
+// alias-collapsed help.
 type FlagSet struct {
 	*flag.FlagSet                   // Embedded StdLib flag set.
 	req           map[string]bool   // Required flags.

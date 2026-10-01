@@ -92,13 +92,13 @@ func ExampleFlagSet_Parse() {
 	// flag "timeout" rejected value "soon"
 }
 
-func ExampleHelpOptions() {
+func ExampleFlagSet_HelpOptions() {
 	fs := xflag.NewFlagSet("example", flag.ContinueOnError)
 	fs.StringSL("name", "n", "", "the name to greet")
 	fs.BoolSL("verbose", "v", false, "enable verbose output")
 
 	fmt.Println("Options:")
-	fmt.Print(xflag.HelpOptions(fs))
+	fmt.Print(fs.HelpOptions())
 	// Output:
 	// Options:
 	//   -n, --name       the name to greet

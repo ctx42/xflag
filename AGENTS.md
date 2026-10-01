@@ -38,7 +38,7 @@ files split the responsibilities:
   - Overridden `Visit`/`VisitAll` that are **alias-aware** (see below).
   - The `*SL` constructors registering long/short pairs (see below).
 
-- **`pkg/xflag/help.go`** — `HelpOptions`/`HelpOptionLines` render tab-aligned
+- **`pkg/xflag/help.go`** — the `HelpOptions`/`HelpOptionLines` methods render
   help that collapses each alias pair onto one line.
 
 ## The alias mechanism (central concept)

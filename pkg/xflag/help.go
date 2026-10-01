@@ -11,19 +11,20 @@ import (
 // HelpOptions returns formatted help with a list of options, collapsing each
 // alias onto its long-flag line. The default usage message of the standard
 // library does not; see [FlagSet] for using it on -h.
-func HelpOptions(fs *FlagSet) string {
+func (fs *FlagSet) HelpOptions() string {
 	buf := &bytes.Buffer{}
 	tw := tabwriter.NewWriter(buf, 0, 8, 4, ' ', 0)
-	for _, lin := range HelpOptionLines(fs) {
+	for _, lin := range fs.HelpOptionLines() {
 		_, _ = tw.Write([]byte(lin))
 	}
 	_ = tw.Flush()
 	return buf.String()
 }
 
-// HelpOptionLines returns the help lines backing [HelpOptions], one per flag in
-// lexicographical order with each alias collapsed onto its long-flag line.
-func HelpOptionLines(fs *FlagSet) []string {
+// HelpOptionLines returns the help lines backing [FlagSet.HelpOptions], one per
+// flag in lexicographical order with each alias collapsed onto its long-flag
+// line.
+func (fs *FlagSet) HelpOptionLines() []string {
 	var buf []string
 	var names []string
 	// The row array holds: 0 - name, 1 - alias, 2 - usage.

@@ -14,7 +14,7 @@ an existing program and reach for the extras only when you need them.
 | Required flags     | Mark `Required`; catch unset flags after parsing.       |
 | Typed accessors    | Get/set without casting: `GetInt`, `SetBool`, etc.      |
 | Long/short aliases | `*SL` binds `--name`/`-n`, returns the value pointer.   |
-| Alias-aware help   | `HelpOptions` folds each alias onto one help line.      |
+| Alias-aware help   | `FlagSet.HelpOptions` folds each alias onto one line.   |
 | `WasSet`           | Tell an explicitly-set flag from a default value.       |
 | Typed parse errors | `Parse` failures wrap in `*ParseError` for `errors.As`. |
 
@@ -86,18 +86,20 @@ fmt.Println(*verbose)
 // true
 ```
 
-`HelpOptions` renders help with each short flag collapsed onto its long-flag
-line, instead of the two separate entries stdlib would print:
+`FlagSet.HelpOptions` renders help with each short flag collapsed onto its
+long-flag line, instead of the two separate entries stdlib would print:
 
-<!-- gmdoceg:pkg/xflag/ExampleHelpOptions -->
+<!-- gmdoceg:pkg/xflag/ExampleFlagSet_HelpOptions -->
 ```go
 fs := xflag.NewFlagSet("example", flag.ContinueOnError)
 fs.StringSL("name", "n", "", "the name to greet")
 fs.BoolSL("verbose", "v", false, "enable verbose output")
 
-fmt.Print(xflag.HelpOptions(fs))
+fmt.Println("Options:")
+fmt.Print(fs.HelpOptions())
 // Output:
-// -n, --name       the name to greet
+// Options:
+//   -n, --name       the name to greet
 //   -v, --verbose    enable verbose output
 ```
 
@@ -180,8 +182,9 @@ top of it:
   `SetString`; low-level access via `Getter` and `Valuer`.
 - **Long/short aliases** — the `*SL` constructor methods `BoolSL`, `IntSL`,
   `Int64SL`, `Uint64SL`, `StringSL`, `Float64SL`, `DurationSL`, `FuncSL`,
-  rendered by `HelpOptions` / `HelpOptionLines`. Each (except `FuncSL`) returns
-  the pointer backing both names, mirroring stdlib `flag.Bool`.
+  rendered by the `HelpOptions` / `HelpOptionLines` methods. Each (except
+  `FuncSL`) returns the pointer backing both names, mirroring stdlib
+  `flag.Bool`.
 - **Typed parse errors** — `Parse` wraps a failure in `*ParseError` (`Flag`,
   `Value`, `Err`); match categories with `errors.Is` against `ErrUndefinedFlag`
   / `ErrNeedsValue`, and `flag.ErrHelp` passes through unwrapped.

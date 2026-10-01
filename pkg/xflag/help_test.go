@@ -7,7 +7,7 @@ import (
 	"github.com/ctx42/testing/pkg/assert"
 )
 
-func Test_HelpOptions(t *testing.T) {
+func Test_FlagSet_HelpOptions(t *testing.T) {
 	t.Run("with aliases", func(t *testing.T) {
 		// --- Given ---
 		fs := NewFlagSet("test", flag.ContinueOnError)
@@ -16,7 +16,7 @@ func Test_HelpOptions(t *testing.T) {
 		fs.StringSL("name", "n", "project", "name help")
 
 		// --- When ---
-		have := HelpOptions(fs)
+		have := fs.HelpOptions()
 
 		// --- Then ---
 		want := "" +
@@ -31,14 +31,14 @@ func Test_HelpOptions(t *testing.T) {
 		fs := NewFlagSet("test", flag.ContinueOnError)
 
 		// --- When ---
-		have := HelpOptions(fs)
+		have := fs.HelpOptions()
 
 		// --- Then ---
 		assert.Empty(t, have)
 	})
 }
 
-func Test_HelpOptionLines(t *testing.T) {
+func Test_FlagSet_HelpOptionLines(t *testing.T) {
 	t.Run("with aliases", func(t *testing.T) {
 		// --- Given ---
 		fs := NewFlagSet("test", flag.ContinueOnError)
@@ -47,7 +47,7 @@ func Test_HelpOptionLines(t *testing.T) {
 		fs.StringSL("name", "n", "project", "name help")
 
 		// --- When ---
-		have := HelpOptionLines(fs)
+		have := fs.HelpOptionLines()
 
 		// --- Then ---
 		want := []string{
@@ -63,7 +63,7 @@ func Test_HelpOptionLines(t *testing.T) {
 		fs := NewFlagSet("test", flag.ContinueOnError)
 
 		// --- When ---
-		have := HelpOptionLines(fs)
+		have := fs.HelpOptionLines()
 
 		// --- Then ---
 		assert.Empty(t, have)
