@@ -51,7 +51,8 @@ fmt.Printf("name=%s count=%d\n", fs.GetString("name"), fs.GetInt("count"))
 ### Required flags
 
 Mark a flag required before parsing; check them all afterwards. `CheckRequired`
-returns `ErrReqFlag` (wrapped, so `errors.Is` works) for the first unset flag:
+returns `ErrReqFlag` (wrapped, so `errors.Is` works) for the first unset flag by
+name, or `ErrNotParsed` when called before parsing:
 
 <!-- gmdoceg:pkg/xflag/ExampleFlagSet_CheckRequired -->
 ```go
@@ -174,12 +175,14 @@ if pe, ok := errors.AsType[*xflag.ParseError](err); ok {
 top of it:
 
 - **Required flags** — `Required`, `IsRequired`, `CheckRequired` (returns
-  `ErrReqFlag`), and `WasSet` to tell a set flag from a default.
+  `ErrReqFlag` or `ErrNotParsed`), and `WasSet` to tell a set flag from a
+  default.
 - **Typed getters** (zero value for an unknown or mismatched-type flag) —
   `GetBool`, `GetInt`, `GetInt64`, `GetUint`, `GetUint64`, `GetString`,
   `GetFloat64`, `GetDuration`.
-- **Typed setters** (error on an unknown or mismatched flag) — `SetBool`,
-  `SetString`; low-level access via `Getter` and `Valuer`.
+- **Typed setters** (error on an unknown or mismatched flag; mark the flag as
+  set, like `Set`) — `SetBool`, `SetString`; low-level access via `Getter` and
+  `Valuer`.
 - **Long/short aliases** — the `*SL` constructor methods `BoolSL`, `IntSL`,
   `Int64SL`, `Uint64SL`, `StringSL`, `Float64SL`, `DurationSL`, `FuncSL`,
   rendered by the `HelpOptions` / `HelpOptionLines` methods. Each (except
@@ -187,7 +190,8 @@ top of it:
   `flag.Bool`.
 - **Typed parse errors** — `Parse` wraps a failure in `*ParseError` (`Flag`,
   `Value`, `Err`); match categories with `errors.Is` against `ErrUndefinedFlag`
-  / `ErrNeedsValue`, and `flag.ErrHelp` passes through unwrapped.
+  / `ErrNeedsValue` / `ErrBadSyntax`, and `flag.ErrHelp` passes through
+  unwrapped.
 
 Full API docs: [pkg.go.dev/github.com/ctx42/xflag/pkg/xflag](https://pkg.go.dev/github.com/ctx42/xflag/pkg/xflag).
 
