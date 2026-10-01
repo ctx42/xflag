@@ -501,7 +501,7 @@ func Test_FlagSet_VisitAll(t *testing.T) {
 		// --- Then ---
 		assert.Equal(t, []string{"name"}, have)
 
-		// A raw stdlib walk sees both flags with real, sentinel-free usage.
+		// A raw stdlib walk sees both flags, each keeping the given usage.
 		raw := make(map[string]string)
 		fs.FlagSet.VisitAll(func(flg *flag.Flag) { raw[flg.Name] = flg.Usage })
 		assert.Equal(t, "name help", raw["n"])
@@ -1162,6 +1162,7 @@ func Test_FlagSet_Valuer(t *testing.T) {
 		// --- Then ---
 		assert.NotNil(t, have)
 		assert.NoError(t, have.Set("abc"))
+
 		assert.Equal(t, "abc", value)
 	})
 }
@@ -1187,7 +1188,7 @@ func Test_FlagSet_BoolSL(t *testing.T) {
 	t.Run("pointer reflects the short flag after Parse", func(t *testing.T) {
 		// --- Given ---
 		fs := NewFlagSet("flg-set", flag.ContinueOnError)
-		have := fs.BoolSL("verbose", "v", false, "usage")
+		val := fs.BoolSL("verbose", "v", false, "usage")
 		args := []string{"-v"}
 
 		// --- When ---
@@ -1195,7 +1196,8 @@ func Test_FlagSet_BoolSL(t *testing.T) {
 
 		// --- Then ---
 		assert.NoError(t, err)
-		assert.True(t, *have)
+
+		assert.True(t, *val)
 	})
 
 	t.Run("records the alias on zero value construction", func(t *testing.T) {
@@ -1232,7 +1234,7 @@ func Test_FlagSet_IntSL(t *testing.T) {
 	t.Run("long and short share the pointer", func(t *testing.T) {
 		// --- Given ---
 		fs := NewFlagSet("flg-set", flag.ContinueOnError)
-		have := fs.IntSL("num", "n", 0, "usage")
+		val := fs.IntSL("num", "n", 0, "usage")
 		args := []string{"--num", "1", "-n", "2"}
 
 		// --- When ---
@@ -1240,7 +1242,8 @@ func Test_FlagSet_IntSL(t *testing.T) {
 
 		// --- Then ---
 		assert.NoError(t, err)
-		assert.Equal(t, 2, *have)
+
+		assert.Equal(t, 2, *val)
 	})
 }
 
@@ -1303,7 +1306,7 @@ func Test_FlagSet_StringSL(t *testing.T) {
 	t.Run("pointer reflects the long flag after Parse", func(t *testing.T) {
 		// --- Given ---
 		fs := NewFlagSet("flg-set", flag.ContinueOnError)
-		have := fs.StringSL("name", "n", "default", "usage")
+		val := fs.StringSL("name", "n", "default", "usage")
 		args := []string{"--name", "long"}
 
 		// --- When ---
@@ -1311,7 +1314,8 @@ func Test_FlagSet_StringSL(t *testing.T) {
 
 		// --- Then ---
 		assert.NoError(t, err)
-		assert.Equal(t, "long", *have)
+
+		assert.Equal(t, "long", *val)
 	})
 }
 

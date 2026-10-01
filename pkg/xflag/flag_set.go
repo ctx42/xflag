@@ -460,9 +460,9 @@ func (fs *FlagSet) IntSL(long, short string, value int, usage string) *int {
 	return val
 }
 
-// Int64SL adds a 64bit int flag with long and short names to the flag set and
-// returns the pointer that stores its value. The long and short names share the
-// pointer.
+// Int64SL adds a 64-bit int flag with long and short names to the flag set
+// and returns the pointer that stores its value. The long and short names
+// share the pointer.
 func (fs *FlagSet) Int64SL(
 	long, short string,
 	value int64,
@@ -500,7 +500,7 @@ func (fs *FlagSet) StringSL(long, short, value, usage string) *string {
 	return val
 }
 
-// Float64SL adds a 64bit float flag with long and short names to the flag set
+// Float64SL adds a 64-bit float flag with long and short names to the flag set
 // and returns the pointer that stores its value. The long and short names share
 // the pointer.
 func (fs *FlagSet) Float64SL(
