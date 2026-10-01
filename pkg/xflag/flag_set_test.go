@@ -18,6 +18,7 @@ func Test_NewFlagSet(t *testing.T) {
 	// --- Then ---
 	assert.Equal(t, "flag-set", have.Name())
 	assert.NotNil(t, have.req)
+	assert.NotNil(t, have.aliasOf)
 }
 
 func Test_NewFlagSetFrom(t *testing.T) {
@@ -31,6 +32,7 @@ func Test_NewFlagSetFrom(t *testing.T) {
 	assert.Same(t, ffs, have.FlagSet)
 	assert.Equal(t, "flag-set", have.Name())
 	assert.NotNil(t, have.req)
+	assert.NotNil(t, have.aliasOf)
 }
 
 func Test_ParseError_Error(t *testing.T) {
