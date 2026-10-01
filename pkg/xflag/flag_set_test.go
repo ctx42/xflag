@@ -202,6 +202,25 @@ func Test_FlagSet_CheckRequired(t *testing.T) {
 		assert.Equal(t, "abc", fs.GetString("name0"))
 	})
 
+	t.Run("error - first missing flag is reported", func(t *testing.T) {
+		// --- Given ---
+		fs := NewFlagSet("flag-set", flag.ContinueOnError)
+		for _, name := range []string{"e", "d", "c", "b", "a"} {
+			fs.String(name, "", "usage")
+			fs.Required(name)
+		}
+		must.Nil(fs.Parse(nil))
+
+		// --- When ---
+		have := make(map[string]bool)
+		for range 100 {
+			have[fs.CheckRequired().Error()] = true
+		}
+
+		// --- Then ---
+		assert.Equal(t, map[string]bool{"`a` flag is required": true}, have)
+	})
+
 	t.Run("error - flags not yet parsed", func(t *testing.T) {
 		// --- Given ---
 		fs := NewFlagSet("flag-set", flag.ContinueOnError)

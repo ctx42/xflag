@@ -211,14 +211,13 @@ func (fs *FlagSet) IsRequired(name string) bool {
 }
 
 // CheckRequired checks all required flags were set. Returns [ErrReqFlag]
-// wrapping one required flag that has not been set; which flag is unspecified
-// when several are missing.
+// wrapping the lexicographically first required flag that has not been set.
 func (fs *FlagSet) CheckRequired() error {
 	if !fs.Parsed() {
 		return errors.New("flags not yet parsed")
 	}
-	for name, required := range fs.req {
-		if required && !fs.WasSet(name) {
+	for _, name := range slices.Sorted(maps.Keys(fs.req)) {
+		if fs.req[name] && !fs.WasSet(name) {
 			return fmt.Errorf("%#q %w", name, ErrReqFlag)
 		}
 	}
