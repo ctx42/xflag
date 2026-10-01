@@ -1,4 +1,11 @@
+[![Go](https://github.com/ctx42/xflag/actions/workflows/go.yml/badge.svg)](https://github.com/ctx42/xflag/actions/workflows/go.yml)
+[![Go Reference](https://pkg.go.dev/badge/github.com/ctx42/xflag.svg)](https://pkg.go.dev/github.com/ctx42/xflag)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/ctx42/xflag)](go.mod)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE.md)
+
 # xflag
+
+Drop-in extensions for Go's standard `flag` package.
 
 xflag is a small wrapper around Go's standard [flag](https://pkg.go.dev/flag)
 package. It adds the pieces the standard library leaves out — required flags,
@@ -18,6 +25,10 @@ an existing program and reach for the extras only when you need them.
 | `WasSet`           | Tell an explicitly-set flag from a default value.       |
 | Typed parse errors | `Parse` failures wrap in `*ParseError` for `errors.As`. |
 
+## Prerequisites
+
+Go 1.26 or later.
+
 ## Install
 
 ```bash
@@ -35,7 +46,7 @@ import "github.com/ctx42/xflag/pkg/xflag"
 Define flags exactly as with the standard library, parse, and read them back
 with typed accessors — no `flag.Lookup(...).Value.(...)` casting:
 
-<!-- gmdoceg:pkg/xflag/ExampleNewFlagSet -->
+<!-- gmmce:pkg/xflag/ExampleNewFlagSet -->
 ```go
 fs := xflag.NewFlagSet("example", flag.ContinueOnError)
 fs.String("name", "world", "the name to greet")
@@ -54,7 +65,7 @@ Mark a flag required before parsing; check them all afterwards. `CheckRequired`
 returns `ErrReqFlag` (wrapped, so `errors.Is` works) for the first unset flag by
 name, or `ErrNotParsed` when called before parsing:
 
-<!-- gmdoceg:pkg/xflag/ExampleFlagSet_CheckRequired -->
+<!-- gmmce:pkg/xflag/ExampleFlagSet_CheckRequired -->
 ```go
 fs := xflag.NewFlagSet("example", flag.ContinueOnError)
 fs.String("token", "", "auth token")
@@ -70,10 +81,9 @@ fmt.Println(fs.CheckRequired())
 ### Long/short aliases
 
 The `*SL` constructors register a long and a short name backed by a single
-value, so `-v` and `--verbose` are interchangeable. They return the pointer
-backing both names, so the value can be read directly instead of by string key:
+value, so `-v` and `--verbose` are interchangeable:
 
-<!-- gmdoceg:pkg/xflag/ExampleFlagSet_BoolSL -->
+<!-- gmmce:pkg/xflag/ExampleFlagSet_BoolSL -->
 ```go
 fs := xflag.NewFlagSet("example", flag.ContinueOnError)
 // The *SL constructors return the pointer backing both names, so the
@@ -90,7 +100,7 @@ fmt.Println(*verbose)
 `FlagSet.HelpOptions` renders help with each short flag collapsed onto its
 long-flag line, instead of the two separate entries stdlib would print:
 
-<!-- gmdoceg:pkg/xflag/ExampleFlagSet_HelpOptions -->
+<!-- gmmce:pkg/xflag/ExampleFlagSet_HelpOptions -->
 ```go
 fs := xflag.NewFlagSet("example", flag.ContinueOnError)
 fs.StringSL("name", "n", "", "the name to greet")
@@ -104,12 +114,16 @@ fmt.Print(fs.HelpOptions())
 //   -v, --verbose    enable verbose output
 ```
 
+The stdlib's own `-h` output still lists `-n` and `--name` as two flags; set
+`fs.Usage` to a function that prints `fs.HelpOptions()` to use the collapsed
+form there too.
+
 ### Wrapping an existing flag set
 
 Already have a `*flag.FlagSet`? Wrap it with `NewFlagSetFrom` to gain the xflag
 extensions without redefining a thing:
 
-<!-- gmdoceg:pkg/xflag/ExampleNewFlagSetFrom -->
+<!-- gmmce:pkg/xflag/ExampleNewFlagSetFrom -->
 ```go
 // Wrap a *flag.FlagSet your program already defined; every stdlib
 // method keeps working and you gain the xflag extensions on top.
@@ -133,7 +147,7 @@ fmt.Println(fs.CheckRequired())
 `WasSet` reports whether a flag actually appeared on the command line — useful
 when a zero value and "the user asked for zero" must be told apart:
 
-<!-- gmdoceg:pkg/xflag/ExampleFlagSet_WasSet -->
+<!-- gmmce:pkg/xflag/ExampleFlagSet_WasSet -->
 ```go
 fs := xflag.NewFlagSet("example", flag.ContinueOnError)
 fs.Int("port", 8080, "server port")
@@ -153,7 +167,7 @@ fmt.Println(fs.WasSet("port")) // ...but the flag was never set.
 so you can react with `errors.As` instead of matching stdlib error strings.
 `flag.ErrHelp` still passes through unwrapped:
 
-<!-- gmdoceg:pkg/xflag/ExampleFlagSet_Parse -->
+<!-- gmmce:pkg/xflag/ExampleFlagSet_Parse -->
 ```go
 fs := xflag.NewFlagSet("example", flag.ContinueOnError)
 fs.SetOutput(io.Discard) // Silence the standard usage output.
@@ -161,7 +175,7 @@ fs.Int("timeout", 0, "seconds to wait")
 
 err := fs.Parse([]string{"-timeout", "soon"})
 
-// errors.As recovers the flag and value without matching error strings.
+// errors.AsType recovers the flag and value without matching error strings.
 if pe, ok := errors.AsType[*xflag.ParseError](err); ok {
 	fmt.Printf("flag %q rejected value %q\n", pe.Flag, pe.Value)
 }
@@ -193,7 +207,9 @@ top of it:
   / `ErrNeedsValue` / `ErrBadSyntax`, and `flag.ErrHelp` passes through
   unwrapped.
 
-Full API docs: [pkg.go.dev/github.com/ctx42/xflag/pkg/xflag](https://pkg.go.dev/github.com/ctx42/xflag/pkg/xflag).
+Full API docs: [pkg.go.dev][godoc].
+
+[godoc]: https://pkg.go.dev/github.com/ctx42/xflag/pkg/xflag
 
 ## License
 
