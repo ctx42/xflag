@@ -277,8 +277,9 @@ func (fs *FlagSet) GetBool(name string) bool {
 	return false
 }
 
-// SetBool sets the value of a boolean flag identified by `name`. If the flag
-// is not of type `bool` or does not exist, it returns an error.
+// SetBool sets the value of a boolean flag identified by `name` and marks it
+// as set, like [flag.FlagSet.Set]. If the flag is not of type `bool` or does
+// not exist, it returns an error.
 func (fs *FlagSet) SetBool(name string, value bool) error {
 	flg := fs.Lookup(name)
 	if flg == nil {
@@ -291,7 +292,7 @@ func (fs *FlagSet) SetBool(name string, value bool) error {
 	if _, ok := get.Get().(bool); !ok {
 		return fmt.Errorf("flag %#q is not a bool", name)
 	}
-	if err := flg.Value.Set(strconv.FormatBool(value)); err != nil {
+	if err := fs.FlagSet.Set(name, strconv.FormatBool(value)); err != nil {
 		return fmt.Errorf("flag %#q %w", name, err)
 	}
 	return nil
@@ -362,8 +363,9 @@ func (fs *FlagSet) GetString(name string) string {
 	return ""
 }
 
-// SetString sets the value of a string flag identified by `name`. If the flag
-// is not of type `string` or does not exist, it returns an error.
+// SetString sets the value of a string flag identified by `name` and marks it
+// as set, like [flag.FlagSet.Set]. If the flag is not of type `string` or does
+// not exist, it returns an error.
 func (fs *FlagSet) SetString(name, value string) error {
 	flg := fs.Lookup(name)
 	if flg == nil {
@@ -376,7 +378,7 @@ func (fs *FlagSet) SetString(name, value string) error {
 	if _, ok := get.Get().(string); !ok {
 		return fmt.Errorf("flag %#q is not a string", name)
 	}
-	if err := flg.Value.Set(value); err != nil {
+	if err := fs.FlagSet.Set(name, value); err != nil {
 		return fmt.Errorf("flag %#q %w", name, err)
 	}
 	return nil

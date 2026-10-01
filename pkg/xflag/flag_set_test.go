@@ -650,6 +650,23 @@ func Test_FlagSet_SetBool(t *testing.T) {
 		assert.Equal(t, "true", fs.Lookup("name").Value.String())
 	})
 
+	t.Run("marks the flag as set", func(t *testing.T) {
+		// --- Given ---
+		fs := NewFlagSet("flag-set", flag.ContinueOnError)
+		fs.BoolSL("verbose", "v", false, "usage")
+		fs.Required("verbose")
+		must.Nil(fs.Parse(nil))
+
+		// --- When ---
+		err := fs.SetBool("v", true)
+
+		// --- Then ---
+		assert.NoError(t, err)
+
+		assert.True(t, fs.WasSet("verbose"))
+		assert.NoError(t, fs.CheckRequired())
+	})
+
 	t.Run("error - set not existing flag", func(t *testing.T) {
 		// --- Given ---
 		fs := NewFlagSet("flag-set", flag.ContinueOnError)
@@ -887,6 +904,23 @@ func Test_FlagSet_SetString(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, "xyz", fs.GetString("name"))
 		assert.Equal(t, "xyz", fs.Lookup("name").Value.String())
+	})
+
+	t.Run("marks the flag as set", func(t *testing.T) {
+		// --- Given ---
+		fs := NewFlagSet("flag-set", flag.ContinueOnError)
+		fs.StringSL("name", "n", "abc", "usage")
+		fs.Required("name")
+		must.Nil(fs.Parse(nil))
+
+		// --- When ---
+		err := fs.SetString("n", "xyz")
+
+		// --- Then ---
+		assert.NoError(t, err)
+
+		assert.True(t, fs.WasSet("name"))
+		assert.NoError(t, fs.CheckRequired())
 	})
 
 	t.Run("set not existing", func(t *testing.T) {
