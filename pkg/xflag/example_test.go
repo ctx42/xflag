@@ -84,7 +84,7 @@ func ExampleFlagSet_Parse() {
 
 	err := fs.Parse([]string{"-timeout", "soon"})
 
-	// errors.As recovers the flag and value without matching error strings.
+	// errors.AsType recovers the flag and value without matching error strings.
 	if pe, ok := errors.AsType[*xflag.ParseError](err); ok {
 		fmt.Printf("flag %q rejected value %q\n", pe.Flag, pe.Value)
 	}
@@ -97,8 +97,10 @@ func ExampleHelpOptions() {
 	fs.StringSL("name", "n", "", "the name to greet")
 	fs.BoolSL("verbose", "v", false, "enable verbose output")
 
+	fmt.Println("Options:")
 	fmt.Print(xflag.HelpOptions(fs))
 	// Output:
-	// -n, --name       the name to greet
+	// Options:
+	//   -n, --name       the name to greet
 	//   -v, --verbose    enable verbose output
 }

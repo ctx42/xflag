@@ -33,18 +33,98 @@ func Test_NewFlagSetFrom(t *testing.T) {
 	assert.NotNil(t, have.req)
 }
 
-func Test_FlagSet(t *testing.T) {
+func Test_ParseError_Error(t *testing.T) {
+	t.Run("preserves the original flag package message", func(t *testing.T) {
+		// --- Given ---
+		fs := NewFlagSet("flag-set", flag.ContinueOnError)
+		fs.Int("num", 0, "usage")
+		args := []string{"--num", "abc"}
+
+		// --- When ---
+		err := fs.Parse(args)
+
+		// --- Then ---
+		want := `invalid value "abc" for flag -num: parse error`
+		assert.ErrorEqual(t, want, err)
+	})
+
+	t.Run("value error without original message", func(t *testing.T) {
+		// --- Given ---
+		pe := &ParseError{Flag: "num", Value: "abc", Err: errors.New("bad")}
+
+		// --- When ---
+		have := pe.Error()
+
+		// --- Then ---
+		assert.Equal(t, `invalid value "abc" for flag "num": bad`, have)
+	})
+
+	t.Run("category error without original message", func(t *testing.T) {
+		// --- Given ---
+		pe := &ParseError{Flag: "num", Err: ErrUndefinedFlag}
+
+		// --- When ---
+		have := pe.Error()
+
+		// --- Then ---
+		assert.Equal(t, `flag provided but not defined: "num"`, have)
+	})
+
+	t.Run("bad syntax error without original message", func(t *testing.T) {
+		// --- Given ---
+		pe := &ParseError{Value: "-=x", Err: ErrBadSyntax}
+
+		// --- When ---
+		have := pe.Error()
+
+		// --- Then ---
+		assert.Equal(t, "bad flag syntax: -=x", have)
+	})
+}
+
+func Test_ParseError_Unwrap(t *testing.T) {
+	// --- Given ---
+	cause := errors.New("boom")
+	pe := &ParseError{Flag: "num", Err: cause}
+
+	// --- When ---
+	have := pe.Unwrap()
+
+	// --- Then ---
+	assert.Same(t, cause, have)
+}
+
+func Test_FlagSet_Parse(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		// --- Given ---
+		fs := NewFlagSet("flag-set", flag.ContinueOnError)
+		fs.String("name0", "abc", "usage0")
+		fs.Required("name0")
+		fs.String("name1", "def", "usage1")
+		args := []string{"--name0", "xyz"}
+
+		// --- When ---
+		err := fs.Parse(args)
+
+		// --- Then ---
+		assert.NoError(t, err)
+
+		assert.Equal(t, "xyz", fs.GetString("name0"))
+	})
+
 	t.Run("alias then long overrides", func(t *testing.T) {
 		// --- Given ---
 		fs := NewFlagSet("flag-set", flag.ContinueOnError)
 		flgName := fs.String("name", "default", "usage")
 		fs.StringVar(flgName, "n", "default", "usage")
+		args := []string{"-n", "short", "--name", "long"}
 
 		// --- When ---
-		err := fs.Parse([]string{"-n", "short", "--name", "long"})
+		err := fs.Parse(args)
 
 		// --- Then ---
 		assert.NoError(t, err)
+
 		assert.Equal(t, "long", fs.GetString("name"))
 	})
 
@@ -53,17 +133,169 @@ func Test_FlagSet(t *testing.T) {
 		fs := NewFlagSet("flag-set", flag.ContinueOnError)
 		flgName := fs.String("name", "default", "usage")
 		fs.StringVar(flgName, "n", "default", "usage")
+		args := []string{"--name", "long", "-n", "short"}
 
 		// --- When ---
-		err := fs.Parse([]string{"--name", "long", "-n", "short"})
+		err := fs.Parse(args)
 
 		// --- Then ---
 		assert.NoError(t, err)
+
 		assert.Equal(t, "short", fs.GetString("name"))
+	})
+
+	t.Run("error - bad value yields a ParseError", func(t *testing.T) {
+		// --- Given ---
+		fs := NewFlagSet("flag-set", flag.ContinueOnError)
+		fs.Int("name0", 123, "usage0")
+		args := []string{"--name0", "abc"}
+
+		// --- When ---
+		err := fs.Parse(args)
+
+		// --- Then ---
+		var pe *ParseError
+		assert.ErrorAs(t, &pe, err)
+		assert.Equal(t, "name0", pe.Flag)
+		assert.Equal(t, "abc", pe.Value)
+		assert.Equal(t, "parse error", pe.Err.Error())
+
+		assert.Equal(t, 0, fs.GetInt("name0"))
+	})
+
+	t.Run("error - bad bool value yields a ParseError", func(t *testing.T) {
+		// --- Given ---
+		fs := NewFlagSet("flag-set", flag.ContinueOnError)
+		fs.Bool("verbose", false, "usage")
+		args := []string{"-verbose=notabool"}
+
+		// --- When ---
+		err := fs.Parse(args)
+
+		// --- Then ---
+		var pe *ParseError
+		assert.ErrorAs(t, &pe, err)
+		assert.Equal(t, "verbose", pe.Flag)
+		assert.Equal(t, "notabool", pe.Value)
+	})
+
+	t.Run("error - undefined flag", func(t *testing.T) {
+		// --- Given ---
+		fs := NewFlagSet("flag-set", flag.ContinueOnError)
+		fs.Int("num", 0, "usage")
+		args := []string{"--nope", "1"}
+
+		// --- When ---
+		err := fs.Parse(args)
+
+		// --- Then ---
+		var pe *ParseError
+		assert.ErrorAs(t, &pe, err)
+		assert.Equal(t, "nope", pe.Flag)
+		assert.Empty(t, pe.Value)
+		assert.ErrorIs(t, ErrUndefinedFlag, err)
+	})
+
+	t.Run("error - flag needs an argument", func(t *testing.T) {
+		// --- Given ---
+		fs := NewFlagSet("flag-set", flag.ContinueOnError)
+		fs.Int("num", 0, "usage")
+		args := []string{"--num"}
+
+		// --- When ---
+		err := fs.Parse(args)
+
+		// --- Then ---
+		var pe *ParseError
+		assert.ErrorAs(t, &pe, err)
+		assert.Equal(t, "num", pe.Flag)
+		assert.ErrorIs(t, ErrNeedsValue, err)
+	})
+
+	t.Run("error - bool func flag fails", func(t *testing.T) {
+		// --- Given ---
+		fs := NewFlagSet("flag-set", flag.ContinueOnError)
+		fn := func(string) error { return errors.New("nope") }
+		fs.BoolFunc("verbose", "usage", fn)
+		args := []string{"-verbose"}
+
+		// --- When ---
+		err := fs.Parse(args)
+
+		// --- Then ---
+		var pe *ParseError
+		assert.ErrorAs(t, &pe, err)
+		assert.Equal(t, "verbose", pe.Flag)
+		assert.Empty(t, pe.Value)
+		assert.Equal(t, "nope", pe.Err.Error())
+		assert.ErrorEqual(t, "invalid boolean flag verbose: nope", err)
+	})
+
+	t.Run("error - bad flag syntax", func(t *testing.T) {
+		// --- Given ---
+		fs := NewFlagSet("flag-set", flag.ContinueOnError)
+		args := []string{"-=x"}
+
+		// --- When ---
+		err := fs.Parse(args)
+
+		// --- Then ---
+		var pe *ParseError
+		assert.ErrorAs(t, &pe, err)
+		assert.Empty(t, pe.Flag)
+		assert.Equal(t, "-=x", pe.Value)
+		assert.ErrorIs(t, ErrBadSyntax, err)
+		assert.ErrorEqual(t, "bad flag syntax: -=x", err)
+	})
+
+	t.Run("help request passes through unwrapped", func(t *testing.T) {
+		// --- Given ---
+		fs := NewFlagSet("flag-set", flag.ContinueOnError)
+		fs.SetOutput(io.Discard)
+		fs.Int("num", 0, "usage")
+		args := []string{"-h"}
+
+		// --- When ---
+		err := fs.Parse(args)
+
+		// --- Then ---
+		assert.ErrorIs(t, flag.ErrHelp, err)
+		var pe *ParseError
+		assert.False(t, errors.As(err, &pe))
 	})
 }
 
-func Test_FlagSet_Required_IsRequired(t *testing.T) {
+func Test_wrapParseError_tabular(t *testing.T) {
+	tt := []struct {
+		testN string
+
+		msg string
+	}{
+		{"unrecognized message", "something unexpected"},
+		{
+			"bad value that is not quoted",
+			"invalid value x for flag -n: parse error",
+		},
+		{"bad value with wrong separator", `invalid value "x" for -n: e`},
+		{"bad value without cause", `invalid value "x" for flag -n`},
+		{"invalid boolean flag without cause", "invalid boolean flag v"},
+	}
+
+	for _, tc := range tt {
+		t.Run(tc.testN, func(t *testing.T) {
+			// --- Given ---
+			err := errors.New(tc.msg)
+
+			// --- When ---
+			have := wrapParseError(err)
+
+			// --- Then ---
+			assert.Same(t, err, have)
+		})
+	}
+}
+
+func Test_FlagSet_Required(t *testing.T) {
 	t.Run("set and get required", func(t *testing.T) {
 		// --- Given ---
 		fs := NewFlagSet("flag-set", flag.ContinueOnError)
@@ -123,8 +355,8 @@ func Test_FlagSet_Required_IsRequired(t *testing.T) {
 		msg := assert.PanicMsg(t, func() { fs.Required("n") })
 
 		// --- Then ---
-		want := "flag `n` is an alias for flag `name`"
-		assert.Equal(t, want, *msg)
+		assert.Equal(t, "flag `n` is an alias for flag `name`", *msg)
+
 		assert.False(t, fs.IsRequired("n"))
 	})
 }
@@ -182,6 +414,7 @@ func Test_FlagSet_CheckRequired(t *testing.T) {
 
 		// --- Then ---
 		assert.NoError(t, err)
+
 		assert.Equal(t, "xyz", fs.GetString("name0"))
 	})
 
@@ -199,6 +432,7 @@ func Test_FlagSet_CheckRequired(t *testing.T) {
 		// --- Then ---
 		assert.ErrorIs(t, ErrReqFlag, err)
 		assert.ErrorEqual(t, "`name0` flag is required", err)
+
 		assert.Equal(t, "abc", fs.GetString("name0"))
 	})
 
@@ -233,225 +467,6 @@ func Test_FlagSet_CheckRequired(t *testing.T) {
 	})
 }
 
-func Test_ParseError_Error(t *testing.T) {
-	t.Run("preserves the original flag package message", func(t *testing.T) {
-		// --- Given ---
-		fs := NewFlagSet("flag-set", flag.ContinueOnError)
-		fs.Int("num", 0, "usage")
-
-		// --- When ---
-		err := fs.Parse([]string{"--num", "abc"})
-
-		// --- Then ---
-		wMsg := `invalid value "abc" for flag -num: parse error`
-		assert.ErrorEqual(t, wMsg, err)
-	})
-
-	t.Run("value error without original message", func(t *testing.T) {
-		// --- Given ---
-		pe := &ParseError{Flag: "num", Value: "abc", Err: errors.New("bad")}
-
-		// --- When ---
-		have := pe.Error()
-
-		// --- Then ---
-		assert.Equal(t, `invalid value "abc" for flag "num": bad`, have)
-	})
-
-	t.Run("category error without original message", func(t *testing.T) {
-		// --- Given ---
-		pe := &ParseError{Flag: "num", Err: ErrUndefinedFlag}
-
-		// --- When ---
-		have := pe.Error()
-
-		// --- Then ---
-		assert.Equal(t, `flag provided but not defined: "num"`, have)
-	})
-
-	t.Run("bad syntax error without original message", func(t *testing.T) {
-		// --- Given ---
-		pe := &ParseError{Value: "-=x", Err: ErrBadSyntax}
-
-		// --- When ---
-		have := pe.Error()
-
-		// --- Then ---
-		assert.Equal(t, "bad flag syntax: -=x", have)
-	})
-}
-
-func Test_ParseError_Unwrap(t *testing.T) {
-	// --- Given ---
-	cause := errors.New("boom")
-	pe := &ParseError{Flag: "num", Err: cause}
-
-	// --- When ---
-	have := pe.Unwrap()
-
-	// --- Then ---
-	assert.Same(t, cause, have)
-}
-
-func Test_FlagSet_Parse(t *testing.T) {
-	t.Run("success", func(t *testing.T) {
-		// --- Given ---
-		fs := NewFlagSet("flag-set", flag.ContinueOnError)
-		fs.String("name0", "abc", "usage0")
-		fs.Required("name0")
-		fs.String("name1", "def", "usage1")
-
-		// --- When ---
-		err := fs.Parse([]string{"--name0", "xyz"})
-
-		// --- Then ---
-		assert.NoError(t, err)
-		assert.Equal(t, "xyz", fs.GetString("name0"))
-	})
-
-	t.Run("error - bad value yields a ParseError", func(t *testing.T) {
-		// --- Given ---
-		fs := NewFlagSet("flag-set", flag.ContinueOnError)
-		fs.Int("name0", 123, "usage0")
-
-		// --- When ---
-		err := fs.Parse([]string{"--name0", "abc"})
-
-		// --- Then ---
-		var pe *ParseError
-		assert.ErrorAs(t, &pe, err)
-		assert.Equal(t, "name0", pe.Flag)
-		assert.Equal(t, "abc", pe.Value)
-		assert.Equal(t, "parse error", pe.Err.Error())
-		assert.Equal(t, 0, fs.GetInt("name0"))
-	})
-
-	t.Run("error - bad bool value yields a ParseError", func(t *testing.T) {
-		// --- Given ---
-		fs := NewFlagSet("flag-set", flag.ContinueOnError)
-		fs.Bool("verbose", false, "usage")
-
-		// --- When ---
-		err := fs.Parse([]string{"-verbose=notabool"})
-
-		// --- Then ---
-		var pe *ParseError
-		assert.ErrorAs(t, &pe, err)
-		assert.Equal(t, "verbose", pe.Flag)
-		assert.Equal(t, "notabool", pe.Value)
-	})
-
-	t.Run("error - undefined flag", func(t *testing.T) {
-		// --- Given ---
-		fs := NewFlagSet("flag-set", flag.ContinueOnError)
-		fs.Int("num", 0, "usage")
-
-		// --- When ---
-		err := fs.Parse([]string{"--nope", "1"})
-
-		// --- Then ---
-		var pe *ParseError
-		assert.ErrorAs(t, &pe, err)
-		assert.Equal(t, "nope", pe.Flag)
-		assert.Empty(t, pe.Value)
-		assert.ErrorIs(t, ErrUndefinedFlag, err)
-	})
-
-	t.Run("error - flag needs an argument", func(t *testing.T) {
-		// --- Given ---
-		fs := NewFlagSet("flag-set", flag.ContinueOnError)
-		fs.Int("num", 0, "usage")
-
-		// --- When ---
-		err := fs.Parse([]string{"--num"})
-
-		// --- Then ---
-		var pe *ParseError
-		assert.ErrorAs(t, &pe, err)
-		assert.Equal(t, "num", pe.Flag)
-		assert.ErrorIs(t, ErrNeedsValue, err)
-	})
-
-	t.Run("error - bool func flag fails", func(t *testing.T) {
-		// --- Given ---
-		fs := NewFlagSet("flag-set", flag.ContinueOnError)
-		fn := func(string) error { return errors.New("nope") }
-		fs.BoolFunc("verbose", "usage", fn)
-		args := []string{"-verbose"}
-
-		// --- When ---
-		err := fs.Parse(args)
-
-		// --- Then ---
-		var pe *ParseError
-		assert.ErrorAs(t, &pe, err)
-		assert.Equal(t, "verbose", pe.Flag)
-		assert.Empty(t, pe.Value)
-		assert.Equal(t, "nope", pe.Err.Error())
-		assert.ErrorEqual(t, "invalid boolean flag verbose: nope", err)
-	})
-
-	t.Run("error - bad flag syntax", func(t *testing.T) {
-		// --- Given ---
-		fs := NewFlagSet("flag-set", flag.ContinueOnError)
-		args := []string{"-=x"}
-
-		// --- When ---
-		err := fs.Parse(args)
-
-		// --- Then ---
-		var pe *ParseError
-		assert.ErrorAs(t, &pe, err)
-		assert.Empty(t, pe.Flag)
-		assert.Equal(t, "-=x", pe.Value)
-		assert.ErrorIs(t, ErrBadSyntax, err)
-		assert.ErrorEqual(t, "bad flag syntax: -=x", err)
-	})
-
-	t.Run("help request passes through unwrapped", func(t *testing.T) {
-		// --- Given ---
-		fs := NewFlagSet("flag-set", flag.ContinueOnError)
-		fs.SetOutput(io.Discard)
-		fs.Int("num", 0, "usage")
-
-		// --- When ---
-		err := fs.Parse([]string{"-h"})
-
-		// --- Then ---
-		assert.ErrorIs(t, flag.ErrHelp, err)
-		var pe *ParseError
-		assert.False(t, errors.As(err, &pe))
-	})
-}
-
-func Test_wrapParseError_tabular(t *testing.T) {
-	tt := []struct {
-		testN string
-
-		msg string
-	}{
-		{"unrecognized message", "something unexpected"},
-		{
-			"bad value that is not quoted",
-			"invalid value x for flag -n: parse error",
-		},
-		{"invalid boolean flag without cause", "invalid boolean flag v"},
-	}
-
-	for _, tc := range tt {
-		t.Run(tc.testN, func(t *testing.T) {
-			// --- Given ---
-			err := errors.New(tc.msg)
-
-			// --- When ---
-			have := wrapParseError(err)
-
-			// --- Then ---
-			assert.Same(t, err, have)
-		})
-	}
-}
-
 func Test_FlagSet_VisitAll(t *testing.T) {
 	t.Run("visiting set values", func(t *testing.T) {
 		// --- Given ---
@@ -477,16 +492,18 @@ func Test_FlagSet_VisitAll(t *testing.T) {
 		fs := NewFlagSet("flag-set", flag.ContinueOnError)
 		fs.StringSL("name", "n", "def", "name help")
 
-		// --- When --- (xflag VisitAll skips the alias)
-		var xNames []string
-		fs.VisitAll(func(flg *flag.Flag) { xNames = append(xNames, flg.Name) })
+		var have []string
+		fn := func(flg *flag.Flag) { have = append(have, flg.Name) }
+
+		// --- When ---
+		fs.VisitAll(fn)
+
+		// --- Then ---
+		assert.Equal(t, []string{"name"}, have)
 
 		// A raw stdlib walk sees both flags with real, sentinel-free usage.
 		raw := make(map[string]string)
 		fs.FlagSet.VisitAll(func(flg *flag.Flag) { raw[flg.Name] = flg.Usage })
-
-		// --- Then ---
-		assert.Equal(t, []string{"name"}, xNames)
 		assert.Equal(t, "name help", raw["n"])
 		assert.Equal(t, "name help", raw["name"])
 	})
@@ -591,9 +608,8 @@ func Test_FlagSet_WasSet_tabular(t *testing.T) {
 	fs.StringSL("flg-a", "a", "flg-a-def", "flg-a help")
 	fs.StringSL("flg-b", "b", "flg-b-def", "flg-b help")
 	fs.StringSL("flg-c", "c", "flg-c-def", "flg-c help")
-
 	fs.String("rouge", "abc", "rouge usage")
-	assert.NoError(t, fs.Parse([]string{"-a", "abc", "--flg-b", "def"}))
+	must.Nil(fs.Parse([]string{"-a", "abc", "--flg-b", "def"}))
 
 	tt := []struct {
 		testN string
@@ -665,6 +681,7 @@ func Test_FlagSet_SetBool(t *testing.T) {
 
 		// --- Then ---
 		assert.NoError(t, err)
+
 		assert.True(t, fs.GetBool("name"))
 		assert.Equal(t, "true", fs.Lookup("name").Value.String())
 	})
@@ -707,6 +724,7 @@ func Test_FlagSet_SetBool(t *testing.T) {
 
 		// --- Then ---
 		assert.ErrorEqual(t, "flag `name` is not a bool", err)
+
 		assert.Equal(t, 42, fs.GetInt("name"))
 		assert.Equal(t, "42", fs.Lookup("name").Value.String())
 	})
@@ -721,6 +739,7 @@ func Test_FlagSet_SetBool(t *testing.T) {
 
 		// --- Then ---
 		assert.ErrorEqual(t, "flag `name` is not a bool", err)
+
 		assert.Equal(t, "abc", fs.GetString("name"))
 	})
 }
@@ -921,6 +940,7 @@ func Test_FlagSet_SetString(t *testing.T) {
 
 		// --- Then ---
 		assert.NoError(t, err)
+
 		assert.Equal(t, "xyz", fs.GetString("name"))
 		assert.Equal(t, "xyz", fs.Lookup("name").Value.String())
 	})
@@ -942,7 +962,7 @@ func Test_FlagSet_SetString(t *testing.T) {
 		assert.NoError(t, fs.CheckRequired())
 	})
 
-	t.Run("set not existing", func(t *testing.T) {
+	t.Run("error - set not existing flag", func(t *testing.T) {
 		// --- Given ---
 		fs := NewFlagSet("flag-set", flag.ContinueOnError)
 
@@ -963,6 +983,7 @@ func Test_FlagSet_SetString(t *testing.T) {
 
 		// --- Then ---
 		assert.ErrorEqual(t, "flag `name` is not a string", err)
+
 		assert.Equal(t, 42, fs.GetInt("name"))
 		assert.Equal(t, "42", fs.Lookup("name").Value.String())
 	})
@@ -977,6 +998,7 @@ func Test_FlagSet_SetString(t *testing.T) {
 
 		// --- Then ---
 		assert.ErrorEqual(t, "flag `name` is not a string", err)
+
 		assert.Equal(t, 42, fs.GetInt("name"))
 	})
 }
@@ -1129,8 +1151,8 @@ func Test_FlagSet_Valuer(t *testing.T) {
 		// --- Given ---
 		fs := NewFlagSet("name", flag.ContinueOnError)
 		fs.String("name0", "default0", "usage0")
-		var value string
 
+		var value string
 		fn := func(s string) error { value = s; return nil }
 		fs.Func("name1", "usage1", fn)
 
@@ -1141,5 +1163,212 @@ func Test_FlagSet_Valuer(t *testing.T) {
 		assert.NotNil(t, have)
 		assert.NoError(t, have.Set("abc"))
 		assert.Equal(t, "abc", value)
+	})
+}
+
+func Test_FlagSet_BoolSL(t *testing.T) {
+	t.Run("registers long and short flags", func(t *testing.T) {
+		// --- Given ---
+		fs := NewFlagSet("flg-set", flag.ContinueOnError)
+
+		// --- When ---
+		fs.BoolSL("name", "n", true, "usage")
+
+		// --- Then ---
+		usage := make(map[string]string)
+		visit := func(flg *flag.Flag) { usage[flg.Name] = flg.Usage }
+		fs.FlagSet.VisitAll(visit)
+		want := map[string]string{"n": "usage", "name": "usage"}
+		assert.Equal(t, want, usage)
+
+		assert.Equal(t, "name", fs.aliasOf["n"])
+	})
+
+	t.Run("pointer reflects the short flag after Parse", func(t *testing.T) {
+		// --- Given ---
+		fs := NewFlagSet("flg-set", flag.ContinueOnError)
+		have := fs.BoolSL("verbose", "v", false, "usage")
+		args := []string{"-v"}
+
+		// --- When ---
+		err := fs.Parse(args)
+
+		// --- Then ---
+		assert.NoError(t, err)
+		assert.True(t, *have)
+	})
+
+	t.Run("records the alias on zero value construction", func(t *testing.T) {
+		// --- Given ---
+		ffs := flag.NewFlagSet("flg-set", flag.ContinueOnError)
+		fs := &FlagSet{FlagSet: ffs} // Nil aliasOf map.
+
+		// --- When ---
+		fs.BoolSL("verbose", "v", false, "usage")
+
+		// --- Then ---
+		assert.Equal(t, "verbose", fs.aliasOf["v"])
+	})
+}
+
+func Test_FlagSet_IntSL(t *testing.T) {
+	t.Run("registers long and short flags", func(t *testing.T) {
+		// --- Given ---
+		fs := NewFlagSet("flg-set", flag.ContinueOnError)
+
+		// --- When ---
+		fs.IntSL("name", "n", 1, "usage")
+
+		// --- Then ---
+		usage := make(map[string]string)
+		visit := func(flg *flag.Flag) { usage[flg.Name] = flg.Usage }
+		fs.FlagSet.VisitAll(visit)
+		want := map[string]string{"n": "usage", "name": "usage"}
+		assert.Equal(t, want, usage)
+
+		assert.Equal(t, "name", fs.aliasOf["n"])
+	})
+
+	t.Run("long and short share the pointer", func(t *testing.T) {
+		// --- Given ---
+		fs := NewFlagSet("flg-set", flag.ContinueOnError)
+		have := fs.IntSL("num", "n", 0, "usage")
+		args := []string{"--num", "1", "-n", "2"}
+
+		// --- When ---
+		err := fs.Parse(args)
+
+		// --- Then ---
+		assert.NoError(t, err)
+		assert.Equal(t, 2, *have)
+	})
+}
+
+func Test_FlagSet_Int64SL(t *testing.T) {
+	t.Run("registers long and short flags", func(t *testing.T) {
+		// --- Given ---
+		fs := NewFlagSet("flg-set", flag.ContinueOnError)
+
+		// --- When ---
+		fs.Int64SL("name", "n", 1, "usage")
+
+		// --- Then ---
+		usage := make(map[string]string)
+		visit := func(flg *flag.Flag) { usage[flg.Name] = flg.Usage }
+		fs.FlagSet.VisitAll(visit)
+		want := map[string]string{"n": "usage", "name": "usage"}
+		assert.Equal(t, want, usage)
+
+		assert.Equal(t, "name", fs.aliasOf["n"])
+	})
+}
+
+func Test_FlagSet_Uint64SL(t *testing.T) {
+	t.Run("registers long and short flags", func(t *testing.T) {
+		// --- Given ---
+		fs := NewFlagSet("flg-set", flag.ContinueOnError)
+
+		// --- When ---
+		fs.Uint64SL("name", "n", 1, "usage")
+
+		// --- Then ---
+		usage := make(map[string]string)
+		visit := func(flg *flag.Flag) { usage[flg.Name] = flg.Usage }
+		fs.FlagSet.VisitAll(visit)
+		want := map[string]string{"n": "usage", "name": "usage"}
+		assert.Equal(t, want, usage)
+
+		assert.Equal(t, "name", fs.aliasOf["n"])
+	})
+}
+
+func Test_FlagSet_StringSL(t *testing.T) {
+	t.Run("registers long and short flags", func(t *testing.T) {
+		// --- Given ---
+		fs := NewFlagSet("flg-set", flag.ContinueOnError)
+
+		// --- When ---
+		fs.StringSL("name", "n", "a", "usage")
+
+		// --- Then ---
+		usage := make(map[string]string)
+		visit := func(flg *flag.Flag) { usage[flg.Name] = flg.Usage }
+		fs.FlagSet.VisitAll(visit)
+		want := map[string]string{"n": "usage", "name": "usage"}
+		assert.Equal(t, want, usage)
+
+		assert.Equal(t, "name", fs.aliasOf["n"])
+	})
+
+	t.Run("pointer reflects the long flag after Parse", func(t *testing.T) {
+		// --- Given ---
+		fs := NewFlagSet("flg-set", flag.ContinueOnError)
+		have := fs.StringSL("name", "n", "default", "usage")
+		args := []string{"--name", "long"}
+
+		// --- When ---
+		err := fs.Parse(args)
+
+		// --- Then ---
+		assert.NoError(t, err)
+		assert.Equal(t, "long", *have)
+	})
+}
+
+func Test_FlagSet_Float64SL(t *testing.T) {
+	t.Run("registers long and short flags", func(t *testing.T) {
+		// --- Given ---
+		fs := NewFlagSet("flg-set", flag.ContinueOnError)
+
+		// --- When ---
+		fs.Float64SL("name", "n", 1, "usage")
+
+		// --- Then ---
+		usage := make(map[string]string)
+		visit := func(flg *flag.Flag) { usage[flg.Name] = flg.Usage }
+		fs.FlagSet.VisitAll(visit)
+		want := map[string]string{"n": "usage", "name": "usage"}
+		assert.Equal(t, want, usage)
+
+		assert.Equal(t, "name", fs.aliasOf["n"])
+	})
+}
+
+func Test_FlagSet_DurationSL(t *testing.T) {
+	t.Run("registers long and short flags", func(t *testing.T) {
+		// --- Given ---
+		fs := NewFlagSet("flg-set", flag.ContinueOnError)
+
+		// --- When ---
+		fs.DurationSL("name", "n", 1, "usage")
+
+		// --- Then ---
+		usage := make(map[string]string)
+		visit := func(flg *flag.Flag) { usage[flg.Name] = flg.Usage }
+		fs.FlagSet.VisitAll(visit)
+		want := map[string]string{"n": "usage", "name": "usage"}
+		assert.Equal(t, want, usage)
+
+		assert.Equal(t, "name", fs.aliasOf["n"])
+	})
+}
+
+func Test_FlagSet_FuncSL(t *testing.T) {
+	t.Run("registers long and short flags", func(t *testing.T) {
+		// --- Given ---
+		fs := NewFlagSet("flg-set", flag.ContinueOnError)
+		fn := func(string) error { return nil }
+
+		// --- When ---
+		fs.FuncSL("name", "n", "usage", fn)
+
+		// --- Then ---
+		usage := make(map[string]string)
+		visit := func(flg *flag.Flag) { usage[flg.Name] = flg.Usage }
+		fs.FlagSet.VisitAll(visit)
+		want := map[string]string{"n": "usage", "name": "usage"}
+		assert.Equal(t, want, usage)
+
+		assert.Equal(t, "name", fs.aliasOf["n"])
 	})
 }

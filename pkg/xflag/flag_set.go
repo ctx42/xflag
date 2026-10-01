@@ -14,6 +14,9 @@ import (
 // ErrReqFlag is returned if a required flag has not been set.
 var ErrReqFlag = errors.New("flag is required")
 
+// Compile-time check that ParseError implements the error interface.
+var _ error = (*ParseError)(nil)
+
 // Parse error causes reported through [ParseError.Err] and matchable with
 // [errors.Is].
 var (
@@ -29,10 +32,14 @@ var (
 )
 
 // FlagSet represents program flags.
+//
+// The default usage message of the embedded flag set, printed on -h and on a
+// parse failure, lists a long flag and its short alias as two flags. Set its
+// Usage field to a function printing [HelpOptions] for alias-collapsed help.
 type FlagSet struct {
 	*flag.FlagSet                   // Embedded StdLib flag set.
 	req           map[string]bool   // Required flags.
-	aliasOf       map[string]string // Maps a short (alias) flag to its long flag.
+	aliasOf       map[string]string // Maps a short flag to its long flag.
 }
 
 // NewFlagSet returns a new instance of FlagSet. It has the same arguments as
@@ -124,11 +131,14 @@ func wrapParseError(err error) error {
 	// The bad-value message differs for bool flags ("invalid boolean value
 	// ... for -name") from every other type ("invalid value ... for flag
 	// -name").
-	if pe := invalidValueError(msg, "invalid value ", " for flag -"); pe != nil {
-		return pe
+	forms := [][2]string{
+		{"invalid value ", " for flag -"},
+		{"invalid boolean value ", " for -"},
 	}
-	if pe := invalidValueError(msg, "invalid boolean value ", " for -"); pe != nil {
-		return pe
+	for _, form := range forms {
+		if pe := invalidValueError(msg, form[0], form[1]); pe != nil {
+			return pe
+		}
 	}
 
 	if name, ok := strings.CutPrefix(
@@ -396,8 +406,8 @@ func (fs *FlagSet) GetFloat64(name string) float64 {
 	return 0
 }
 
-// GetDuration returns parsed (or default) value of the [time.Duration] flag.
-// Returns zero value for an unknown flag or when the flag is of a different
+// GetDuration returns the parsed (or default) value of the [time.Duration]
+// flag. Returns zero for an unknown flag or when the flag is of a different
 // type.
 func (fs *FlagSet) GetDuration(name string) time.Duration {
 	if flg := fs.Lookup(name); flg != nil {
@@ -410,8 +420,8 @@ func (fs *FlagSet) GetDuration(name string) time.Duration {
 	return 0
 }
 
-// Getter returns getter for a flag with a given name or nil if a flag does not
-// exist or doesn't implement [flag.Getter] interface.
+// Getter returns the getter for a flag with a given name or nil if the flag
+// does not exist or doesn't implement the [flag.Getter] interface.
 func (fs *FlagSet) Getter(name string) flag.Getter {
 	if flg := fs.Lookup(name); flg != nil {
 		if get, ok := flg.Value.(flag.Getter); ok {
@@ -428,4 +438,101 @@ func (fs *FlagSet) Valuer(name string) flag.Value {
 		return flg.Value
 	}
 	return nil
+}
+
+// BoolSL adds a bool flag with long and short names to the flag set and
+// returns the pointer that stores its value. The long and short names share
+// the pointer.
+func (fs *FlagSet) BoolSL(long, short string, value bool, usage string) *bool {
+	val := fs.Bool(long, value, usage)
+	fs.BoolVar(val, short, value, usage)
+	fs.recordAlias(short, long)
+	return val
+}
+
+// IntSL adds an int flag with long and short names to the flag set and
+// returns the pointer that stores its value. The long and short names share
+// the pointer.
+func (fs *FlagSet) IntSL(long, short string, value int, usage string) *int {
+	val := fs.Int(long, value, usage)
+	fs.IntVar(val, short, value, usage)
+	fs.recordAlias(short, long)
+	return val
+}
+
+// Int64SL adds a 64bit int flag with long and short names to the flag set and
+// returns the pointer that stores its value. The long and short names share the
+// pointer.
+func (fs *FlagSet) Int64SL(
+	long, short string,
+	value int64,
+	usage string,
+) *int64 {
+
+	val := fs.Int64(long, value, usage)
+	fs.Int64Var(val, short, value, usage)
+	fs.recordAlias(short, long)
+	return val
+}
+
+// Uint64SL adds an unsigned 64-bit int flag with long and short names to the
+// flag set and returns the pointer that stores its value. The long and short
+// names share the pointer.
+func (fs *FlagSet) Uint64SL(
+	long, short string,
+	value uint64,
+	usage string,
+) *uint64 {
+
+	val := fs.Uint64(long, value, usage)
+	fs.Uint64Var(val, short, value, usage)
+	fs.recordAlias(short, long)
+	return val
+}
+
+// StringSL adds a string flag with long and short names to the flag set and
+// returns the pointer that stores its value. The long and short names share the
+// pointer.
+func (fs *FlagSet) StringSL(long, short, value, usage string) *string {
+	val := fs.String(long, value, usage)
+	fs.StringVar(val, short, value, usage)
+	fs.recordAlias(short, long)
+	return val
+}
+
+// Float64SL adds a 64bit float flag with long and short names to the flag set
+// and returns the pointer that stores its value. The long and short names share
+// the pointer.
+func (fs *FlagSet) Float64SL(
+	long, short string,
+	value float64,
+	usage string,
+) *float64 {
+
+	val := fs.Float64(long, value, usage)
+	fs.Float64Var(val, short, value, usage)
+	fs.recordAlias(short, long)
+	return val
+}
+
+// DurationSL adds a duration flag with long and short names to the flag set and
+// returns the pointer that stores its value. The long and short names share the
+// pointer.
+func (fs *FlagSet) DurationSL(
+	long, short string,
+	value time.Duration,
+	usage string,
+) *time.Duration {
+
+	val := fs.Duration(long, value, usage)
+	fs.DurationVar(val, short, value, usage)
+	fs.recordAlias(short, long)
+	return val
+}
+
+// FuncSL adds a "function" flag with long and short names to the flag set.
+func (fs *FlagSet) FuncSL(long, short, usage string, fn func(string) error) {
+	fs.Func(long, usage, fn)
+	fs.Func(short, usage, fn)
+	fs.recordAlias(short, long)
 }
