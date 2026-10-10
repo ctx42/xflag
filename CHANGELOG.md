@@ -1,3 +1,6 @@
+## v0.11.1 (Sat, 10 Oct 2026 19:13:52 UTC)
+- build(deps): update github.com/ctx42/testing to v0.57.0.
+
 ## v0.11.0 (Thu, 01 Oct 2026 19:33:22 UTC)
 - fix: wrap bad syntax and bool func failures in ParseError.
 - fix: visit set flags in long flag name order.
